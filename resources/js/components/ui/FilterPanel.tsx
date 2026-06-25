@@ -6,7 +6,7 @@ import ReactSelect, { type StylesConfig } from 'react-select';
 export interface FilterField {
     key: string;
     label: string;
-    type: 'text' | 'number' | 'select';
+    type: 'text' | 'number' | 'select' | 'date';
     multi?: boolean;
     options?: { value: string | number; label: string }[];
 }

@@ -19,16 +19,22 @@ class Interview extends Model
         'platform',
         'recording_url',
         'duration_seconds',
+        'recruiter_notes',
         'status',
         'scheduled_at',
         'completed_at',
         'expectations',
+        'decision',
+        'decision_comment',
+        'decision_by',
+        'decision_at',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'completed_at' => 'datetime',
         'duration_seconds' => 'integer',
+        'decision_at' => 'datetime',
     ];
 
     /**
@@ -63,5 +69,15 @@ class Interview extends Model
     public function transcription(): HasOne
     {
         return $this->hasOne(Transcription::class, 'interview_id');
+    }
+
+    public function decisionBy()
+    {
+        return $this->belongsTo(User::class, 'decision_by');
+    }
+
+    public function report()
+    {
+        return $this->hasOne(InterviewReport::class);
     }
 }

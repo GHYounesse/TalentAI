@@ -171,7 +171,7 @@ function DetailPanel({ selected, selectedIndex, onClose }: DetailPanelProps) {
                 {/* breakdown bars */}
                 {breakdown.length > 0 && (
                     <div className="mt-4 space-y-2.5">
-                        {breakdown.map(([key, value]) => {
+                        {breakdown.map(([key, value = 0]) => {
                             const meta = BREAKDOWN_META[key] ?? {
                                 label: key,
                                 bar: 'bg-ds-accent',

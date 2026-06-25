@@ -6,10 +6,13 @@ use App\Enums\CandidatStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Brief;
 use App\Models\Candidat;
+use App\Models\Interview;
 use App\Services\ActivityLogger;
+use App\Services\LushaService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -52,6 +55,12 @@ class CandidatController extends Controller
                 }
 
                 continue;
+            }
+            if ($field === 'recruiter_notes') {
+                $query->whereHas('interviews', fn ($q) => $q->where('recruiter_notes', 'LIKE', '%'.$value.'%'));
+
+                continue;
+
             }
 
             if (in_array($field, $textFields)) {
@@ -322,8 +331,9 @@ class CandidatController extends Controller
                 [Candidat::class]
             );
 
-            $candidat->load('briefs');
+            $candidat->load('briefs', 'interviews');
             $firstBrief = $candidat->briefs->first();
+            $interview = $candidat->interviews->first();
 
             return Inertia::render('Candidats/Show', [
                 'candidat' => array_merge($candidat->toArray(), [
@@ -333,6 +343,7 @@ class CandidatController extends Controller
                         ? round($firstBrief->pivot->score)
                         : null,
                     'ai_analysis' => $firstBrief?->pivot?->ai_analysis,
+                    'recruiter_notes' => $interview?->recruiter_notes,
                 ]),
             ]);
         } catch (\Throwable $e) {
@@ -484,6 +495,325 @@ class CandidatController extends Controller
 
             return Inertia::render('Fallback', [
                 'error' => 'Impossible de supprimer ce candidat.',
+            ]);
+        }
+    }
+
+    /**
+     * Display the interview history for the specified candidat.
+     *
+     * @param  Candidat  $candidat  Route-model-bound Candidat instance
+     * @return Response Inertia page — Candidats/Historique — or Candidats/Fallback on failure
+     */
+    public function historique(Candidat $candidat): Response
+    {
+        /** @var ActivityLogger $logger */
+        $logger = app(ActivityLogger::class);
+
+        try {
+            $candidat->load([
+                'interviews' => function ($query) {
+                    $query
+                        ->with([
+                            'brief:id,title,sector,contract_type',
+                            'interviewer:id,name,email',
+                            'transcription:interview_id,analysis_score,analysis_verdict,analysis_status',
+                            'report:interview_id,score_global,verdict,strengths,watch_points,ai_recommendation',
+                            'decisionBy:id,name',
+                        ])
+                        ->orderByDesc('scheduled_at');
+                },
+            ]);
+
+            $interviews = $candidat->interviews->map(fn ($interview) => [
+                'id' => $interview->id,
+                'platform' => $interview->platform,
+                'status' => $interview->status,
+                'scheduled_at' => $interview->scheduled_at?->toDateTimeString(),
+                'completed_at' => $interview->completed_at?->toDateTimeString(),
+                'decision' => $interview->decision,
+                'decision_comment' => $interview->decision_comment,
+                'decision_at' => $interview->decision_at?->toDateTimeString(),
+
+                'brief' => $interview->brief ? [
+                    'id' => $interview->brief->id,
+                    'title' => $interview->brief->title,
+                    'sector' => $interview->brief->sector,
+                    'contract_type' => $interview->brief->contract_type,
+                ] : null,
+
+                'interviewer' => $interview->interviewer ? [
+                    'id' => $interview->interviewer->id,
+                    'name' => $interview->interviewer->name,
+                    'email' => $interview->interviewer->email,
+                ] : null,
+
+                'decision_by' => $interview->decisionBy ? [
+                    'id' => $interview->decisionBy->id,
+                    'name' => $interview->decisionBy->name,
+                ] : null,
+
+                'ai_score' => $interview->transcription?->analysis_score,
+                'ai_verdict' => $interview->transcription?->analysis_verdict,
+
+                'report' => $interview->report ? [
+                    'score_global' => $interview->report->score_global,
+                    'verdict' => $interview->report->verdict,
+                    'strengths' => $interview->report->strengths,
+                    'watch_points' => $interview->report->watch_points,
+                    'ai_recommendation' => $interview->report->ai_recommendation,
+                ] : null,
+            ]);
+
+            $logger->log(
+                'candidat.historique',
+                "Consultation de l'historique des entretiens du candidat « {$candidat->full_name} » (ID : {$candidat->id}).",
+                ['candidat_id' => $candidat->id, 'interviews_count' => $interviews->count()],
+                [Candidat::class]
+            );
+
+            return Inertia::render('Candidats/Historique', [
+                'candidat' => [
+                    'id' => $candidat->id,
+                    'full_name' => $candidat->full_name,
+                    'headline' => $candidat->headline,
+                    'location' => $candidat->location,
+                    'current_title' => $candidat->current_title,
+                    'current_company' => $candidat->current_company,
+                    'linkedin_url' => $candidat->linkedin_url,
+                    'status' => $candidat->status,
+                    'open_to_work' => $candidat->open_to_work,
+                    'profile_photo' => (function () use ($candidat) {
+                        $pic = data_get($candidat->raw_data, 'profilePicture');
+                        if (! $pic) {
+                            return null;
+                        }
+                        if (is_string($pic)) {
+                            return $pic;
+                        }
+                        $sizes = data_get($pic, 'sizes', []);
+                        foreach ($sizes as $size) {
+                            if (($size['width'] ?? 0) === 200) {
+                                return $size['url'];
+                            }
+                        }
+
+                        return data_get($pic, 'url');
+                    })(),
+                ],
+                'interviews' => $interviews,
+            ]);
+
+        } catch (\Throwable $e) {
+            $logger->log(
+                'candidat.historique.error',
+                "Erreur lors de la consultation de l'historique du candidat (ID : {$candidat->id}) : ".$e->getMessage(),
+                ['candidat_id' => $candidat->id, 'exception' => $e->getMessage()],
+                [Candidat::class]
+            );
+
+            return Inertia::render('Fallback', [
+                'error' => "Impossible d'afficher l'historique de ce candidat.",
+            ]);
+        }
+    }
+
+    /**
+     * Record or update the recruiter's decision (accepted/rejected/pending) for an interview.
+     *
+     * @param  Request  $request  Must contain `decision` (accepted|rejected|pending) and optional `decision_comment`
+     * @param  Interview  $interview  Interview being decided on
+     * @return RedirectResponse Redirects back with a flash message
+     */
+    public function decide(Request $request, Interview $interview): RedirectResponse
+    {
+        $this->authorize('interviews.decide');
+
+        /** @var ActivityLogger $logger */
+        $logger = app(ActivityLogger::class);
+
+        try {
+            $validated = $request->validate([
+                'decision' => ['required', 'in:accepted,rejected,pending'],
+                'decision_comment' => ['nullable', 'string', 'max:2000'],
+            ]);
+
+            $isReset = $validated['decision'] === 'pending';
+
+            $interview->update([
+                'decision' => $validated['decision'],
+                'decision_comment' => $isReset ? null : ($validated['decision_comment'] ?? null),
+                'decision_by' => $isReset ? null : auth()->id(),
+                'decision_at' => $isReset ? null : now(),
+            ]);
+
+            $logger->log(
+                'interview.decide',
+                "Décision {$validated['decision']} enregistrée pour l'entretien (ID : {$interview->id}).",
+                ['interview_id' => $interview->id, 'decision' => $validated['decision']],
+                [Interview::class]
+            );
+
+            return back()->with('success', $isReset
+                ? 'Décision réinitialisée.'
+                : 'Décision enregistrée avec succès.');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            $logger->log(
+                'interview.decide.error',
+                "Erreur lors de l'enregistrement de la décision (ID : {$interview->id}) : ".$e->getMessage(),
+                ['interview_id' => $interview->id, 'exception' => $e->getMessage()],
+                [Interview::class]
+            );
+
+            return back()->with('error', "Impossible d'enregistrer la décision.");
+        }
+    }
+
+    /**
+     * Enrich a candidate's contact information using the Lusha service.
+     *
+     * @return RedirectResponse|Response Redirects back with success/error message, or renders Candidats/Fallback on unexpected failure
+     */
+    public function enrichContact(Request $request, Candidat $candidat, LushaService $lushaService): RedirectResponse|Response
+    {
+
+        /** @var ActivityLogger $logger */
+        $logger = app(ActivityLogger::class);
+
+        try {
+
+            $logger->log(
+                'candidat.enrich.start',
+                "Début enrichissement Lusha pour « {$candidat->full_name} » (ID: {$candidat->id}).",
+                [
+                    'candidate_id' => $candidat->id,
+                    'linkedin_url' => $candidat->linkedin_url,
+                ],
+                [Candidat::class]
+            );
+
+            if (! $candidat->linkedin_url) {
+                return back()->with('error', 'LinkedIn URL is required for enrichment.');
+            }
+
+            /**
+             * STEP 1: SEARCH
+             */
+            $contact = $lushaService->searchContact($candidat->linkedin_url);
+
+            if (! $contact) {
+
+                $logger->log(
+                    'candidat.enrich.not_found',
+                    "Aucun contact trouvé sur Lusha pour « {$candidat->full_name} ».",
+                    ['candidate_id' => $candidat->id],
+                    [Candidat::class]
+                );
+
+                return back()->with('error', 'No contact found');
+            }
+
+            /**
+             * STEP 2: ENRICH
+             */
+            $enriched = $lushaService->enrichContact($contact['id']);
+
+            if (! $enriched) {
+
+                $logger->log(
+                    'candidat.enrich.failed',
+                    "Échec enrichissement Lusha pour « {$candidat->full_name} ».",
+                    ['lusha_id' => $contact['id']],
+                    [Candidat::class]
+                );
+
+                return back()->with('error', 'Enrichment failed');
+            }
+
+            /**
+             * STEP 3: COMPARE MODIFICATIONS (comme update())
+             */
+            $before = [
+                'email' => $candidat->email,
+                'phone' => $candidat->phone,
+            ];
+
+            $after = [
+                'email' => $enriched['emails'][0]['email'] ?? $candidat->email,
+                'phone' => $enriched['phones'][0]['number'] ?? $candidat->phone,
+            ];
+
+            $emailFound = ! empty($enriched['emails'][0]['email']);
+            $phoneFound = ! empty($enriched['phones'][0]['number']);
+
+            if ($emailFound && $phoneFound) {
+                $message = 'Contact avec succès';
+            } elseif ($emailFound) {
+                $message = 'Email trouvé et enregistré avec succès.';
+            } elseif ($phoneFound) {
+                $message = 'Numéro de téléphone trouvé et enregistré avec succès.';
+            } else {
+                $message = 'Aucun email ni numéro de téléphone n’a été trouvé pour ce candidat.';
+            }
+
+            $modifications = collect($after)
+                ->filter(fn ($value, $key) => $before[$key] != $value)
+                ->map(fn ($value, $key) => [
+                    'avant' => $before[$key],
+                    'après' => $value,
+                ])
+                ->toArray();
+
+            /**
+             * STEP 4: UPDATE
+             */
+            $candidat->update([
+                'email' => $after['email'],
+                'phone' => $after['phone'],
+                'raw_data' => array_merge(
+                    $candidat->raw_data ?? [],
+                    ['lusha' => $enriched]
+                ),
+            ]);
+
+            /**
+             * STEP 5: LOG FINAL
+             */
+            $champsModifiés = implode(', ', array_keys($modifications));
+
+            $logger->log(
+                'candidat.enrich.success',
+                "Enrichissement réussi pour « {$candidat->full_name} ».",
+                [
+                    'candidate_id' => $candidat->id,
+                    'lusha_id' => $contact['id'],
+                    'modifications' => $modifications,
+                    'fields_changed' => $champsModifiés ?: 'none',
+                ],
+                [Candidat::class]
+            );
+
+            return back()->with([
+                'success' => $message,
+            ]);
+
+        } catch (\Throwable $e) {
+
+            $logger->log(
+                'candidat.enrich.error',
+                "Erreur enrichissement Lusha pour « {$candidat->full_name} ».",
+                [
+                    'error' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                ],
+                [Candidat::class]
+            );
+
+            return Inertia::render('Fallback', [
+                'error' => 'Impossible d’enrichir ce candidat.',
+                'candidat' => $candidat,
             ]);
         }
     }

@@ -12,6 +12,8 @@ return [
             'brief_label' => 'Job Brief',
             'brief_placeholder' => 'Select a brief…',
             'platform_label' => 'Interview Type',
+            'recruiter_notes_label' => 'Recruiter Notes',
+            'recruiter_notes_placeholder' => 'Separate the information with a comma. Example: HTML, Driving Licence B, Capable, Independent, ...',
         ],
         'actions' => [
             'upload' => 'Upload',

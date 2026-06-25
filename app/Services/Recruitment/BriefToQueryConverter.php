@@ -32,8 +32,8 @@ class BriefToQueryConverter
      */
     public function convert(Brief $brief, array $options = []): array
     {
-        $openToWork = (bool) ($options['open_to_work'] ?? false);
         $jobTitleQuery = $options['job_title_query'] ?? null;
+        $mode = $options['mode'] ?? 'targeted';
         $startPage = max(1, (int) ($options['start_page'] ?? 1));
         $takePages = max(1, (int) ($options['take_pages'] ?? 4));
 
@@ -47,10 +47,21 @@ class BriefToQueryConverter
         // --- Job title query ---
         // Uses the AI-generated Boolean string (e.g. "commercial" NOT (responsable OR directeur)).
         // Falls back to a plain quoted title if no query was provided.
+        // searchQuery mirrors currentJobTitles to also match profiles via headline and other fields.
         if ($jobTitleQuery) {
-            $input['currentJobTitles'] = [mb_substr(trim($jobTitleQuery), 0, 300)];
+            $query = mb_substr(trim($jobTitleQuery), 0, 300);
+            if ($mode === 'broad') {
+                $input['searchQuery'] = $query;
+            } else {
+                $input['currentJobTitles'] = [$query];
+            }
         } elseif ($brief->title) {
-            $input['currentJobTitles'] = ['"'.trim($brief->title).'"'];
+            $query = '"'.trim($brief->title).'"';
+            if ($mode === 'broad') {
+                $input['searchQuery'] = $query;
+            } else {
+                $input['currentJobTitles'] = [$query];
+            }
         }
 
         /*
@@ -136,11 +147,6 @@ class BriefToQueryConverter
             if (! empty($companies)) {
                 $input['currentCompanies'] = $companies;
             }
-        }
-
-        // --- Candidate state filters ---
-        if ($openToWork) {
-            $input['openToWork'] = true;
         }
 
         /*

@@ -23,6 +23,7 @@ return [
         'list' => 'Interviews',
         'reports' => 'AI Reports',
         'cv-analysis' => 'CV Analysis',
+        'historique' => 'Historique',
     ],
 
     'settings' => [

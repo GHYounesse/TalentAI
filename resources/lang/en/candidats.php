@@ -181,12 +181,15 @@ return [
             'description' => 'Are you sure you want to permanently delete this candidat?',
             'cancel' => 'Cancel',
             'confirm' => 'Yes, delete',
+            'recruiter_notes' => 'Recruiter Notes',
+            'close' => 'Close',
         ],
 
         'filters' => [
             'full_name' => 'Full name',
             'headline' => 'Headline',
             'location' => 'Location',
+            'recruiter_notes' => 'Recruiter notes',
             'current_company' => 'Company',
             'current_title' => 'Current position',
             'experience_years' => 'Experience',

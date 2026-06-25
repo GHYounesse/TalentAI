@@ -181,12 +181,15 @@ return [
             'description' => 'Êtes-vous sûr de vouloir supprimer définitivement ce candidat ?',
             'cancel' => 'Annuler',
             'confirm' => 'Oui, supprimer',
+            'recruiter_notes' => 'Notes du recruteur',
+            'close' => 'Fermer',
         ],
 
         'filters' => [
             'full_name' => 'Nom complet',
             'headline' => 'Titre professionnel',
             'location' => 'Localisation',
+            'recruiter_notes' => 'Notes du recruteur',
             'current_company' => 'Entreprise',
             'current_title' => 'Poste actuel',
             'experience_years' => 'Expérience',

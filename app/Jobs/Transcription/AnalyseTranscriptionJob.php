@@ -31,14 +31,21 @@ class AnalyseTranscriptionJob implements ShouldQueue
         private readonly array $otherCandidates = [],
     ) {}
 
-    /**
-     * Laravel resolves TranscriptionAnalysisService automatically from the service container.
-     */
     public function handle(TranscriptionAnalysisService $analysisService): void
     {
+        $start = microtime(true);
+
+        Log::info('AnalyseTranscriptionJob: started', [
+            'transcription_id' => $this->transcription->id,
+            'interview_id' => $this->transcription->interview_id,
+            'attempt' => $this->attempts(),
+            'transcript_length' => mb_strlen($this->transcription->diarized_transcript ?? ''),
+        ]);
+
         if (empty($this->transcription->diarized_transcript)) {
             Log::warning('AnalyseTranscriptionJob: no diarized_transcript, aborting.', [
                 'transcription_id' => $this->transcription->id,
+                'interview_id' => $this->transcription->interview_id,
             ]);
 
             $this->transcription->update([
@@ -50,6 +57,10 @@ class AnalyseTranscriptionJob implements ShouldQueue
         }
 
         $this->transcription->update(['analysis_status' => 'processing']);
+
+        Log::info('AnalyseTranscriptionJob: calling analysis service', [
+            'transcription_id' => $this->transcription->id,
+        ]);
 
         $result = $analysisService->analyse(
             $this->transcription->diarized_transcript,
@@ -67,8 +78,10 @@ class AnalyseTranscriptionJob implements ShouldQueue
 
         Log::info('AnalyseTranscriptionJob: analysis complete', [
             'transcription_id' => $this->transcription->id,
+            'interview_id' => $this->transcription->interview_id,
             'score' => $result['global_score'],
             'verdict' => $result['verdict'],
+            'duration_ms' => (int) ((microtime(true) - $start) * 1000),
         ]);
     }
 
@@ -76,7 +89,10 @@ class AnalyseTranscriptionJob implements ShouldQueue
     {
         Log::error('AnalyseTranscriptionJob failed', [
             'transcription_id' => $this->transcription->id,
+            'interview_id' => $this->transcription->interview_id,
+            'attempts' => $this->attempts(),
             'error' => $e->getMessage(),
+            'exception_class' => get_class($e),
         ]);
 
         $this->transcription->update([

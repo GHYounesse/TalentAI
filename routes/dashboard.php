@@ -19,6 +19,7 @@ Route::middleware(['auth'])->group(function () {
         require __DIR__.'/users.php';
         require __DIR__.'/activitylogs.php';
         require __DIR__.'/parameters.php';
+        require __DIR__.'/historique.php';
 
     });
 });

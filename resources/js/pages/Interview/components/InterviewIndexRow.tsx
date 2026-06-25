@@ -39,42 +39,76 @@ function AudioModal({ url, candidateName, onClose }: { url: string; candidateNam
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [loadError, setLoadError] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
+
         const onTimeUpdate = () => {
             setCurrentTime(audio.currentTime);
             setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
         };
-        const onLoaded = () => setDuration(audio.duration);
+        const onLoaded = () => {
+            setDuration(audio.duration);
+            setLoading(false);
+        };
         const onEnded = () => setPlaying(false);
+        const onError = () => {
+            setLoadError(true);
+            setLoading(false);
+            setPlaying(false);
+        };
+
         audio.addEventListener('timeupdate', onTimeUpdate);
         audio.addEventListener('loadedmetadata', onLoaded);
         audio.addEventListener('ended', onEnded);
+        audio.addEventListener('error', onError);
+
         return () => {
             audio.removeEventListener('timeupdate', onTimeUpdate);
             audio.removeEventListener('loadedmetadata', onLoaded);
             audio.removeEventListener('ended', onEnded);
+            audio.removeEventListener('error', onError);
             audio.pause();
         };
     }, []);
 
+    // Close on Escape
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [onClose]);
+
     const togglePlay = () => {
         const audio = audioRef.current;
-        if (!audio) return;
+        if (!audio || loadError) return;
+
         if (playing) {
             audio.pause();
             setPlaying(false);
-        } else {
-            audio.play();
-            setPlaying(true);
+            return;
         }
+
+        // audio.play() returns a promise that rejects if playback fails
+        // (e.g. broken source, browser autoplay policy) — must be handled
+        // or React state desyncs from actual playback state.
+        audio
+            .play()
+            .then(() => setPlaying(true))
+            .catch(() => {
+                setLoadError(true);
+                setPlaying(false);
+            });
     };
 
     const seek = (e: React.MouseEvent<HTMLDivElement>) => {
         const audio = audioRef.current;
-        if (!audio || !audio.duration) return;
+        if (!audio || !audio.duration || loadError) return;
         const rect = e.currentTarget.getBoundingClientRect();
         audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
     };
@@ -111,39 +145,54 @@ function AudioModal({ url, candidateName, onClose }: { url: string; candidateNam
                     </button>
                 </div>
 
-                {/* Waveform */}
-                <div className="bg-ds-bg mb-4 flex items-center justify-center gap-[3px] rounded-xl px-4 py-5">
-                    {BARS.map((h, i) => (
-                        <div
-                            key={i}
-                            className={`w-[4px] rounded-full transition-colors duration-100 ${(i / BARS.length) * 100 <= progress ? 'bg-ds-accent' : 'bg-ds-text3/20'}`}
-                            style={{ height: `${h}px` }}
-                        />
-                    ))}
-                </div>
-
-                {/* Seek bar */}
-                <div className="mb-2 cursor-pointer" onClick={seek}>
-                    <div className="bg-ds-bg3 h-1.5 w-full overflow-hidden rounded-full">
-                        <div className="bg-ds-accent h-full rounded-full transition-all" style={{ width: `${progress}%` }} />
+                {loadError ? (
+                    /* Error state — file missing/unreachable (e.g. deleted post-transcription) */
+                    <div className="bg-ds-bg mb-4 flex flex-col items-center justify-center gap-2 rounded-xl px-4 py-8 text-center">
+                        <p className="text-ds-text2 text-[13px] font-medium">Enregistrement indisponible</p>
+                        <p className="text-ds-text3 text-[12px]">Ce fichier audio a peut-être été supprimé après la transcription.</p>
                     </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Waveform */}
+                        <div className="bg-ds-bg mb-4 flex items-center justify-center gap-[3px] rounded-xl px-4 py-5">
+                            {loading ? (
+                                <span className="text-ds-text3 text-[12px]">Chargement…</span>
+                            ) : (
+                                BARS.map((h, i) => (
+                                    <div
+                                        key={i}
+                                        className={`w-[4px] rounded-full transition-colors duration-100 ${(i / BARS.length) * 100 <= progress ? 'bg-ds-accent' : 'bg-ds-text3/20'}`}
+                                        style={{ height: `${h}px` }}
+                                    />
+                                ))
+                            )}
+                        </div>
 
-                {/* Time */}
-                <div className="text-ds-text3 mb-5 flex justify-between text-[11px]">
-                    <span>{fmt(currentTime)}</span>
-                    <span>{fmt(duration)}</span>
-                </div>
+                        {/* Seek bar */}
+                        <div className="mb-2 cursor-pointer" onClick={seek}>
+                            <div className="bg-ds-bg3 h-1.5 w-full overflow-hidden rounded-full">
+                                <div className="bg-ds-accent h-full rounded-full transition-all" style={{ width: `${progress}%` }} />
+                            </div>
+                        </div>
 
-                {/* Play / Pause */}
-                <div className="flex justify-center">
-                    <button
-                        onClick={togglePlay}
-                        className="bg-ds-accent flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-[#7C74FF]"
-                    >
-                        {playing ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
-                    </button>
-                </div>
+                        {/* Time */}
+                        <div className="text-ds-text3 mb-5 flex justify-between text-[11px]">
+                            <span>{fmt(currentTime)}</span>
+                            <span>{fmt(duration)}</span>
+                        </div>
+
+                        {/* Play / Pause */}
+                        <div className="flex justify-center">
+                            <button
+                                onClick={togglePlay}
+                                disabled={loading}
+                                className="bg-ds-accent flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-[#7C74FF] disabled:opacity-50"
+                            >
+                                {playing ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
+                            </button>
+                        </div>
+                    </>
+                )}
 
                 <audio ref={audioRef} src={url} preload="metadata" />
             </div>

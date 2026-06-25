@@ -12,6 +12,8 @@ return [
             'brief_label' => 'Brief de poste',
             'brief_placeholder' => 'Sélectionnez un brief…',
             'platform_label' => 'Type d\'entretien',
+            'recruiter_notes_label' => 'Notes de l\'recruteur',
+            'recruiter_notes_placeholder' => 'Séparez les informations par une virgule. Exemple : HTML, Permis B, Capable, Autonome, ...',
         ],
         'actions' => [
             'upload' => 'Téléverser',

@@ -78,6 +78,7 @@ return [
         'export' => 'Export',
         'manage' => 'Manage',
         'connect' => 'Connect',
+        'decide' => 'Decide',
     ],
 
     'create_modal' => [

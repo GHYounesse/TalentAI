@@ -130,6 +130,7 @@ export default function Index({ interviews, filters = [] }: Props) {
     const FILTER_FIELDS = [
         { key: 'candidate', label: 'Candidate', type: 'text' as const },
         { key: 'brief', label: 'Brief', type: 'text' as const },
+        { key: 'recruiter_notes', label: 'Recruiter Notes', type: 'text' as const },
         {
             key: 'status',
             label: t('interviews.list.filters.status'),
@@ -185,6 +186,7 @@ export default function Index({ interviews, filters = [] }: Props) {
         const search = activeFilters.find((f) => f.field === 'search')?.value ?? '';
         const status = activeFilters.find((f) => f.field === 'status')?.value ?? '';
         const platform = activeFilters.find((f) => f.field === 'platform')?.value ?? '';
+        const recruiterNotes = activeFilters.find((f) => f.field === 'recruiter_notes')?.value ?? '';
 
         return data.filter((i) => {
             const matchSearch =
@@ -193,7 +195,8 @@ export default function Index({ interviews, filters = [] }: Props) {
                 i.brief_title.toLowerCase().includes(String(search).toLowerCase());
             const matchStatus = !status || i.transcription_status === status;
             const matchPlatform = !platform || i.platform === platform;
-            return matchSearch && matchStatus && matchPlatform;
+            const matchRecruiterNotes = !recruiterNotes || i.recruiter_notes?.toLowerCase().includes(String(recruiterNotes).toLowerCase());
+            return matchSearch && matchStatus && matchPlatform && matchRecruiterNotes;
         });
     }, [data, activeFilters]);
 

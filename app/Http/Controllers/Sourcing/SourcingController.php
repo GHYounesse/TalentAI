@@ -94,8 +94,8 @@ class SourcingController extends Controller
         try {
             $validated = $request->validate([
                 'brief_id' => 'required|integer|exists:briefs,id',
-                'open_to_work' => 'nullable|boolean',
                 'job_title_query' => 'nullable|string|max:300',
+                'mode' => 'nullable|string|in:broad,targeted',
                 'force' => 'nullable|boolean',
                 'start_page' => 'nullable|integer|min:1|max:100',
                 'take_pages' => 'nullable|integer|min:1|max:100',
@@ -125,8 +125,8 @@ class SourcingController extends Controller
             }
 
             $options = [
-                'open_to_work' => (bool) ($validated['open_to_work'] ?? false),
                 'job_title_query' => $validated['job_title_query'] ?? null,
+                'mode' => $validated['mode'] ?? 'targeted',
                 'start_page' => (int) ($validated['start_page'] ?? $brief->next_start_page ?? 1),
                 'take_pages' => (int) ($validated['take_pages'] ?? 4),
             ];
@@ -181,6 +181,7 @@ class SourcingController extends Controller
             $validated = $request->validate([
                 'brief_id' => 'required|integer|exists:briefs,id',
                 'search_prompt' => 'nullable|string|max:1000',
+                'mode' => 'nullable|string|in:broad,targeted',
             ]);
 
             $brief = Brief::findOrFail($validated['brief_id']);
@@ -190,7 +191,8 @@ class SourcingController extends Controller
                 return response()->json(['query' => '']);
             }
 
-            $query = $this->queryGenerator->generate($brief->title ?? '', $prompt);
+            $mode = $validated['mode'] ?? 'targeted';
+            $query = $this->queryGenerator->generate($brief->title ?? '', $prompt, $mode);
 
             // Persist to history and update the cached current_query on the brief
             BriefQueryHistory::create(['brief_id' => $brief->id, 'query' => $query]);

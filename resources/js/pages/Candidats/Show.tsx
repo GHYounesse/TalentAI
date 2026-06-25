@@ -1,5 +1,6 @@
 import AiAnalysisPanel from '@/components/Candidats/AiAnalysisPanel';
 import DeleteModal from '@/components/ui/DeleteModal';
+import { useI18n } from '@/hooks/useI18n';
 import AppLayout from '@/layouts/app-layout';
 import type { Candidat } from '@/types/candidat';
 import { Head, Link, router } from '@inertiajs/react';
@@ -32,6 +33,31 @@ function scoreColor(score: number) {
     if (score >= 70) return 'text-[#818CF8]';
     if (score >= 55) return 'text-[#22D3EE]';
     return 'text-ds-text3';
+}
+
+function BadgeList({ value }: { value?: string }) {
+    const items =
+        value
+            ?.split(',')
+            .map((s) => s.trim())
+            .filter(Boolean) ?? [];
+
+    if (items.length === 0) {
+        return <span className="text-ds-text3 text-sm">No recruiter notes</span>;
+    }
+
+    return (
+        <div className="flex flex-wrap gap-2">
+            {items.map((item, index) => (
+                <span
+                    key={`${item}-${index}`}
+                    className="inline-flex items-center rounded-full border border-[#818CF8]/20 bg-[#818CF8]/10 px-3 py-1 text-[11px] font-medium text-[#818CF8]"
+                >
+                    {item}
+                </span>
+            ))}
+        </div>
+    );
 }
 
 const card = 'bg-ds-surface border border-ds-border rounded-2xl p-5';
@@ -94,6 +120,8 @@ export default function ShowCandidat({ candidat }: Props) {
     const [showDelete, setShowDelete] = useState(false);
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(candidat.ai_analysis ?? null);
     const [generating, setGenerating] = useState(false);
+    const [showNotes, setShowNotes] = useState(false);
+    const { t } = useI18n();
 
     async function handleGenerate() {
         if (!candidat.brief_id) return;
@@ -166,22 +194,78 @@ export default function ShowCandidat({ candidat }: Props) {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
+                        <button
+                            onClick={() => setShowNotes(true)}
+                            className="text-ds-p flex items-center gap-1.5 rounded-xl border border-[#818CF8]/30 px-3 py-2 text-[12px] transition hover:bg-[#818CF8]/5"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.5}
+                                stroke="currentColor"
+                                className="size-4"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                                />
+                            </svg>
+                            {t(`candidats.index.modal.recruiter_notes`)}
+                        </button>
                         <Link
                             href={route('dashboard.candidats.edit', candidat.id)}
                             className="border-ds-border text-ds-text2 hover:border-ds-border2 hover:text-ds-text flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] transition"
                         >
                             <Pencil size={13} />
-                            Modifier
+                            {t(`candidats.index.actions.edit`)}
                         </Link>
                         <button
                             onClick={() => setShowDelete(true)}
                             className="border-ds-red/30 text-ds-red hover:bg-ds-red/5 flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] transition"
                         >
                             <Trash2 size={13} />
-                            Supprimer
+                            {t(`candidats.index.actions.delete`)}
                         </button>
                     </div>
                 </div>
+                {showNotes && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                        {/* Modal */}
+                        <div className="border-ds-border bg-ds-surface relative w-[520px] rounded-2xl border shadow-2xl">
+                            {/* Header */}
+                            <div className="border-ds-border flex items-center justify-between border-b px-5 py-4">
+                                <h2 className="text-ds-text text-[15px] font-semibold">{t(`candidats.index.modal.recruiter_notes`)}</h2>
+
+                                {/* Close button (X) */}
+                                <button
+                                    onClick={() => setShowNotes(false)}
+                                    className="text-ds-text3 hover:text-ds-text hover:bg-ds-bg3 flex h-8 w-8 items-center justify-center rounded-lg transition"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="px-5 py-4">
+                                <div className="flex flex-wrap gap-2">
+                                    <BadgeList value={candidat.recruiter_notes} />
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="border-ds-border flex justify-end border-t px-5 py-3">
+                                <button
+                                    onClick={() => setShowNotes(false)}
+                                    className="bg-ds-bg3 text-ds-text2 hover:bg-ds-border rounded-lg px-4 py-1.5 text-sm transition"
+                                >
+                                    {t(`candidats.index.modal.close`)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     {/* LEFT column */}

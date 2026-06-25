@@ -193,7 +193,6 @@ export default function Index({ briefs, filters }: Props) {
     const [runState, setRunState] = useState<RunState | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    const [openToWork, setOpenToWork] = useState(false);
     const [startPage, setStartPage] = useState(1);
     const [takePages, setTakePages] = useState(4);
 
@@ -206,12 +205,7 @@ export default function Index({ briefs, filters }: Props) {
     const [history, setHistory] = useState<QueryHistoryEntry[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-    /*
-     * MODE TOGGLE (broad / exact) — hidden while validating AI-generated query approach.
-     * Re-enable once we have enough data on result quality.
-     *
-     * const [mode, setMode] = useState<'broad' | 'exact'>('broad');
-     */
+    const [mode, setMode] = useState<'broad' | 'targeted'>('targeted');
 
     const esRef = useRef<EventSource | null>(null);
     const seenIdsRef = useRef<Set<number>>(new Set());
@@ -226,13 +220,14 @@ export default function Index({ briefs, filters }: Props) {
     // Query generation
     // ---------------------------------------------------------------------------
 
-    async function generateQuery(brief: Brief) {
+    async function generateQuery(brief: Brief, overrideMode?: 'broad' | 'targeted') {
         if (!brief.title) return;
         setIsGenerating(true);
         try {
             const { data } = await axios.post<{ query: string }>(route('dashboard.sourcing.generate-query'), {
                 brief_id: brief.id,
                 search_prompt: brief.search_prompt ?? '',
+                mode: overrideMode ?? mode,
             });
             setJobTitleQuery(data.query ?? '');
         } catch {
@@ -388,8 +383,8 @@ export default function Index({ briefs, filters }: Props) {
         try {
             const { data } = await axios.post<{ run_id: number }>(route('dashboard.sourcing.launch'), {
                 brief_id: briefId,
-                open_to_work: openToWork,
                 job_title_query: jobTitleQuery || undefined,
+                mode,
                 start_page: startPage,
                 take_pages: takePages,
                 force: true,
@@ -519,23 +514,32 @@ export default function Index({ briefs, filters }: Props) {
                                 />
                             </div>
 
-                            {/*
-                             * MODE TOGGLE (Large / Exact) — hidden while validating AI-generated query approach.
-                             * Re-enable once we have enough data on result quality.
-                             *
-                             * <div>
-                             *   <p className="text-ds-text3 mb-1.5 block text-[12px] font-semibold tracking-[0.8px] uppercase">
-                             *     Mode de recherche
-                             *   </p>
-                             *   <div className="inline-flex overflow-hidden rounded-lg border border-ds-border">
-                             *     {(['broad', 'exact'] as const).map((m) => (
-                             *       <button key={m} onClick={() => setMode(m)} disabled={isRunning} ...>
-                             *         {m === 'broad' ? 'Large' : 'Exact'}
-                             *       </button>
-                             *     ))}
-                             *   </div>
-                             * </div>
-                             */}
+                            <div className="mb-5">
+                                <p className="text-ds-text3 mb-1.5 block text-[12px] font-semibold tracking-[0.8px] uppercase">Mode de recherche</p>
+                                <div className="border-ds-border inline-flex overflow-hidden rounded-lg border">
+                                    {(['broad', 'targeted'] as const).map((m) => (
+                                        <button
+                                            key={m}
+                                            type="button"
+                                            onClick={() => {
+                                                setMode(m);
+                                                if (selectedBrief) generateQuery(selectedBrief, m);
+                                            }}
+                                            disabled={isRunning}
+                                            className={`px-4 py-2 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                mode === m ? 'bg-ds-accent text-white' : 'bg-ds-surface text-ds-text2 hover:bg-ds-border'
+                                            }`}
+                                        >
+                                            {m === 'broad' ? 'Large' : 'Ciblé'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-ds-text3 mt-1 text-[11px]">
+                                    {mode === 'broad'
+                                        ? 'Recherche large via headline et profil (max 5 exclusions)'
+                                        : 'Recherche ciblée sur le titre de poste actuel'}
+                                </p>
+                            </div>
 
                             {/* AI-generated query preview */}
                             <div className="mb-5">
@@ -601,23 +605,6 @@ export default function Index({ briefs, filters }: Props) {
                                         </span>
                                     )}
                                 </p>
-                            </div>
-
-                            {/* Filters */}
-                            <div className="mb-5">
-                                <p className="text-ds-text3 mb-2 text-[12px] font-semibold tracking-[0.8px] uppercase">Filtres</p>
-                                <label
-                                    className={`text-ds-text flex cursor-pointer items-center gap-2 text-[13px] ${isRunning ? 'cursor-not-allowed opacity-50' : ''}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={openToWork}
-                                        onChange={(e) => setOpenToWork(e.target.checked)}
-                                        disabled={isRunning}
-                                        className="accent-ds-accent h-3.5 w-3.5"
-                                    />
-                                    Open to work
-                                </label>
                             </div>
 
                             {/* Pagination */}

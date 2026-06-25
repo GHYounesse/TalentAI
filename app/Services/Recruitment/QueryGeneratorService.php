@@ -17,7 +17,7 @@ class QueryGeneratorService
 {
     private const MAX_CHARS = 300;
 
-    private const SYSTEM_PROMPT = <<<'PROMPT'
+    private const SYSTEM_PROMPT_TARGETED = <<<'PROMPT'
 You are a LinkedIn recruiter search expert. Given a job title and a recruiter's instruction in French or English, generate a LinkedIn Boolean search string for the currentJobTitles field.
 
 Rules:
@@ -30,13 +30,26 @@ Rules:
 7. If no exclusions are needed, output just the quoted title.
 PROMPT;
 
-    public function generate(string $briefTitle, string $searchPrompt): string
+    private const SYSTEM_PROMPT_BROAD = <<<'PROMPT'
+You are a LinkedIn recruiter search expert. Given a job title and a recruiter's instruction in French or English, generate a LinkedIn Boolean search string for the searchQuery field (fuzzy search).
+
+Rules:
+1. Output ONLY the search string, nothing else — no explanation, no markdown, no quotes around the whole string.
+2. Format: "job title" NOT (excluded1 OR excluded2 OR ...)
+3. Use the exact job title from the brief inside double quotes.
+4. Extract the most important exclusion keywords only. Maximum 5 exclusion terms total.
+5. All operators (NOT, OR) must be UPPERCASE.
+6. The entire output must not exceed 280 characters.
+7. If no exclusions are needed, output just the quoted title.
+PROMPT;
+
+    public function generate(string $briefTitle, string $searchPrompt, string $mode = 'targeted'): string
     {
         $userMessage = "Brief title: {$briefTitle}\nInstruction: {$searchPrompt}";
 
-        $result = $this->tryOpenRouter($userMessage)
-            ?? $this->tryGroq($userMessage)
-            ?? $this->hardcodedFallback($briefTitle, $searchPrompt);
+        $result = $this->tryOpenRouter($userMessage, $mode)
+            ?? $this->tryGroq($userMessage, $mode)
+            ?? $this->hardcodedFallback($briefTitle, $searchPrompt, $mode);
 
         // Reject responses that echo the prompt rather than generating a query
         if ($this->looksLikePrompt($result)) {
@@ -55,13 +68,14 @@ PROMPT;
             || str_starts_with($text, 'Brief title');
     }
 
-    private function tryOpenRouter(string $userMessage): ?string
+    private function tryOpenRouter(string $userMessage, string $mode = 'targeted'): ?string
     {
         $key = config('services.openrouter.key');
         if (! $key) {
             return null;
         }
 
+        $systemPrompt = $mode === 'broad' ? self::SYSTEM_PROMPT_BROAD : self::SYSTEM_PROMPT_TARGETED;
         $models = config('services.openrouter.sourcing_models', ['google/gemini-2.0-flash-exp:free']);
 
         foreach ($models as $model) {
@@ -75,7 +89,7 @@ PROMPT;
                     ->post('https://openrouter.ai/api/v1/chat/completions', [
                         'model' => $model,
                         'messages' => [
-                            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+                            ['role' => 'system', 'content' => $systemPrompt],
                             ['role' => 'user', 'content' => $userMessage],
                         ],
                         'max_tokens' => 100,
@@ -106,12 +120,14 @@ PROMPT;
         return null;
     }
 
-    private function tryGroq(string $userMessage): ?string
+    private function tryGroq(string $userMessage, string $mode = 'targeted'): ?string
     {
         $key = config('services.groq.key');
         if (! $key) {
             return null;
         }
+
+        $systemPrompt = $mode === 'broad' ? self::SYSTEM_PROMPT_BROAD : self::SYSTEM_PROMPT_TARGETED;
 
         try {
             $response = Http::withToken($key)
@@ -119,7 +135,7 @@ PROMPT;
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => 'llama-3.1-8b-instant',
                     'messages' => [
-                        ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+                        ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => $userMessage],
                     ],
                     'max_tokens' => 100,
@@ -145,12 +161,14 @@ PROMPT;
      * Rule-based fallback: extract explicit exclusions from the prompt + apply
      * a seniority/management exclusion list when "junior" or "débutant" is detected.
      */
-    private function hardcodedFallback(string $briefTitle, string $searchPrompt): string
+    private function hardcodedFallback(string $briefTitle, string $searchPrompt, string $mode = 'targeted'): string
     {
         $prompt = mb_strtolower($searchPrompt);
 
         // Management/seniority terms always worth excluding
-        $managementTerms = ['responsable', 'directeur', 'manager', 'chef', 'lead', 'head', 'senior', 'principal', 'VP', 'DG', 'DAF'];
+        $managementTerms = $mode === 'broad'
+            ? ['responsable', 'directeur', 'manager', 'chef', 'lead']
+            : ['responsable', 'directeur', 'manager', 'chef', 'lead', 'head', 'senior', 'principal', 'VP', 'DG', 'DAF'];
 
         // Detect junior intent
         $wantsJunior = preg_match('/junior|débutant|debutant|entry.level|0.?[àa].?2.?ans/u', $prompt);

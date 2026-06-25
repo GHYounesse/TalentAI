@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import type { Candidat, IndexCandidatProps } from '@/types/candidat';
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, ExternalLink, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -225,6 +225,7 @@ export default function Index({ candidats, filters, briefs }: IndexCandidatProps
         { key: 'current_title', label: t('candidats.index.filters.current_title'), type: 'text' as const },
         { key: 'experience_years', label: t('candidats.index.filters.experience_years'), type: 'number' as const },
         { key: 'education_level', label: t('candidats.index.filters.education_level'), type: 'text' as const },
+        { key: 'recruiter_notes', label: t('candidats.index.filters.recruiter_notes'), type: 'text' as const },
         {
             key: 'sector',
             label: t('candidats.index.filters.sector'),
@@ -284,6 +285,23 @@ export default function Index({ candidats, filters, briefs }: IndexCandidatProps
             onSuccess: () => setDeletingCandidat(null),
         });
     }
+
+    const enrichCandidate = (id: number) => {
+        console.log('Button clicked', id);
+
+        router.post(
+            route('dashboard.candidats.enrich-contact', id),
+            {},
+            {
+                onSuccess: () => {
+                    console.log('Success');
+                },
+                onError: (errors) => {
+                    console.error('Error', errors);
+                },
+            },
+        );
+    };
 
     function handleSearch(filtersOverride?: FilterEntry[]) {
         const toSearch = filtersOverride ?? activeFilters;
@@ -532,7 +550,51 @@ export default function Index({ candidats, filters, briefs }: IndexCandidatProps
                                                             href={route('dashboard.candidats.show', candidat.id)}
                                                             className="border-ds-border text-ds-text2 hover:border-ds-border2 hover:text-ds-text rounded-xl border px-3 py-1.5 text-[12px] transition"
                                                         >
-                                                            Voir
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                strokeWidth={1.5}
+                                                                stroke="currentColor"
+                                                                className="size-4"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
+                                                                />
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                                                                />
+                                                            </svg>
+                                                        </Link>
+                                                        <button
+                                                            onClick={() => enrichCandidate(candidat.id)}
+                                                            className="border-ds-border text-ds-text2 hover:border-ds-border2 hover:text-ds-text rounded-xl border px-3 py-1.5 text-[12px] transition"
+                                                        >
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                strokeWidth={1.5}
+                                                                stroke="currentColor"
+                                                                className="size-4"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"
+                                                                />
+                                                            </svg>
+                                                        </button>
+                                                        <Link
+                                                            href={route('dashboard.candidats.historique', candidat.id)}
+                                                            title="Historique des entretiens"
+                                                            className="border-ds-border text-ds-text3 hover:border-ds-accent/40 hover:text-ds-accent flex h-7 w-7 items-center justify-center rounded-xl border transition"
+                                                        >
+                                                            <Clock size={12} />
                                                         </Link>
                                                         {candidat.brief_id && (
                                                             <button

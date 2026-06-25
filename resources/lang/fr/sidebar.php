@@ -23,6 +23,7 @@ return [
         'list' => 'Entretiens',
         'reports' => 'Rapports IA',
         'cv-analysis' => 'Analyse CV',
+        'historique' => 'Historique',
     ],
 
     'settings' => [

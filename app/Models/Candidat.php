@@ -40,6 +40,11 @@ class Candidat extends Model
             ->withTimestamps();
     }
 
+    public function interviews()
+    {
+        return $this->hasMany(Interview::class, 'candidate_id');
+    }
+
     protected function casts(): array
     {
         return [

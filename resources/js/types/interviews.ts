@@ -9,6 +9,7 @@ export interface InterviewRecord {
     brief_title: string;
     duration_minutes: number | null;
     platform: string;
+    recruiter_notes: string | null;
     scheduled_at: string;
     transcription_status: string;
     transcription_id: number | null;
@@ -75,6 +76,7 @@ export interface InterviewData {
     candidate_name: string;
     brief_title: string;
     platform: string;
+    recruiter_notes: string | null;
     scheduled_at: string;
     interviewer: string;
     duration_minutes: number | null;

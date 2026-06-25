@@ -15,11 +15,14 @@ use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class InterviewController extends Controller
 {
@@ -130,6 +133,14 @@ class InterviewController extends Controller
                         );
                     });
                 }
+                if ($filter['field'] === 'recruiter_notes') {
+                    $query->where(
+                        'recruiter_notes',
+                        'like',
+                        '%'.$filter['value'].'%'
+                    );
+
+                }
             }
 
             $interviews = $query
@@ -141,6 +152,7 @@ class InterviewController extends Controller
                     'brief_id' => $i->brief?->id,
                     'brief_title' => $i->brief?->title ?? '—',
                     'platform' => $i->platform,
+                    'recruiter_notes' => $i->recruiter_notes,
                     'scheduled_at' => $i->scheduled_at?->format('d M Y'),
                     'transcription_status' => $i->transcription?->status ?? 'none',
                     'transcription_id' => $i->transcription?->id,
@@ -191,6 +203,8 @@ class InterviewController extends Controller
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
+        $uploadedPath = null;
+
         try {
             $request->validate([
                 'audio' => [
@@ -203,33 +217,44 @@ class InterviewController extends Controller
                 'brief_id' => ['required', 'integer', 'exists:briefs,id'],
                 'platform' => ['required', 'string', 'in:zoom,meet,teams,presentiel'],
                 'expectations' => ['nullable', 'string', 'max:2000'],
+                'recruiter_notes' => ['nullable', 'string', 'max:2000'],
             ]);
-
-            $interview = Interview::create([
-                'candidate_id' => $request->candidate_id,
-                'brief_id' => $request->brief_id,
-                'interviewer_id' => auth()->user()->id,
-                'platform' => $request->platform,
-                'status' => 'recording_uploaded',
-                'expectations' => $request->expectations,
-                'scheduled_at' => now(),
-            ]);
-
-            $path = $request->file('audio')->store('transcriptions/pending', 's3');
 
             /** @var AwsS3V3Adapter $s3 */
             $s3 = Storage::disk('s3');
-            $audioUrl = $s3->url($path);
 
-            $transcription = Transcription::create([
-                'interview_id' => $interview->id,
-                'status' => 'pending',
-                'audio_path' => $path,
-                'audio_url' => $audioUrl,
-            ]);
+            [$interview, $transcription] = DB::transaction(function () use ($request, $s3, &$uploadedPath) {
+                $interview = Interview::create([
+                    'candidate_id' => $request->candidate_id,
+                    'brief_id' => $request->brief_id,
+                    'interviewer_id' => auth()->user()->id,
+                    'platform' => $request->platform,
+                    'status' => 'recording_uploaded',
+                    'expectations' => $request->expectations,
+                    'recruiter_notes' => $request->recruiter_notes,
+                    'scheduled_at' => now(),
+                ]);
+
+                $path = $request->file('audio')->store('transcriptions/pending', 's3');
+
+                // Track the uploaded path outside the closure scope so the
+                // outer catch block can clean it up if anything after this fails.
+                $uploadedPath = $path;
+
+                $audioUrl = $s3->url($path);
+
+                $transcription = Transcription::create([
+                    'interview_id' => $interview->id,
+                    'status' => 'pending',
+                    'audio_path' => $path,
+                    'audio_url' => $audioUrl,
+                ]);
+
+                return [$interview, $transcription];
+            });
 
             // Pre-signed URL valid for 1 hour — long enough for AssemblyAI to fetch the file
-            $presignedUrl = $s3->temporaryUrl($path, now()->addHour());
+            $presignedUrl = $s3->temporaryUrl($transcription->audio_path, now()->addHour());
 
             $assemblyTranscriptId = $assemblyAI->submit($presignedUrl);
 
@@ -246,6 +271,19 @@ class InterviewController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
+            if ($uploadedPath) {
+                try {
+                    Storage::disk('s3')->delete($uploadedPath);
+                } catch (\Throwable $cleanupException) {
+                    $logger->log(
+                        'interview.upload.cleanup_failed',
+                        "Échec du nettoyage S3 après une erreur d'upload (path : {$uploadedPath}) : ".$cleanupException->getMessage(),
+                        ['path' => $uploadedPath, 'exception' => $cleanupException->getMessage()],
+                        [Interview::class]
+                    );
+                }
+            }
+
             $logger->log(
                 'interview.upload.error',
                 'Erreur lors de la soumission de l\'entretien : '.$e->getMessage(),
@@ -317,16 +355,17 @@ class InterviewController extends Controller
                 $peers = Interview::with(['candidate', 'transcription'])
                     ->where('brief_id', $interview->brief_id)
                     ->whereHas('transcription', fn ($q) => $q->where('analysis_status', 'done'))
+                    ->join('transcriptions', 'transcriptions.interview_id', '=', 'interviews.id')
+                    ->orderByDesc('transcriptions.analysis_score')
+                    ->select('interviews.*')
                     ->get()
                     ->map(fn ($i) => [
                         'id' => $i->id,
                         'candidate_name' => $i->candidate?->full_name ?? '—',
-                        'global_score' => $i->transcription?->analysis_result['global_score'] ?? null,
+                        'global_score' => $i->transcription?->analysis_score,
                         'verdict' => $i->transcription?->analysis_result['verdict'] ?? null,
                         'criteria' => $i->transcription?->analysis_result['criteria'] ?? [],
                     ])
-                    ->sortByDesc('global_score')
-                    ->values()
                     ->all();
             }
 
@@ -386,60 +425,76 @@ class InterviewController extends Controller
         $logger = app(ActivityLogger::class);
 
         try {
-            $interview->load(['transcription', 'brief']);
-            $transcription = $interview->transcription;
+            $interview->load('brief');
+
+            $transcription = DB::transaction(function () use ($interview, $assemblyAI) {
+                $transcription = Transcription::where('interview_id', $interview->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $transcription) {
+                    return null;
+                }
+
+                if ($transcription->status === 'pending' && $transcription->assemblyai_transcript_id) {
+                    $assemblyStatus = $assemblyAI->checkStatus($transcription->assemblyai_transcript_id);
+
+                    if ($assemblyStatus === 'completed') {
+                        Log::info('Interview status check: AssemblyAI completed, processing utterances', [
+                            'transcription_id' => $transcription->id,
+                            'interview_id' => $interview->id,
+                            'assemblyai_transcript_id' => $transcription->assemblyai_transcript_id,
+                            'pending_since' => $transcription->created_at?->diffForHumans(),
+                        ]);
+                        $utterances = $assemblyAI->fetchUtterances($transcription->assemblyai_transcript_id);
+
+                        $firstSpeaker = $utterances[0]['speaker'] ?? 'A';
+                        $speakerMap = [$firstSpeaker => 'Interviewer'];
+                        foreach ($utterances as $u) {
+                            if (! isset($speakerMap[$u['speaker']])) {
+                                $speakerMap[$u['speaker']] = 'Candidate';
+                            }
+                        }
+
+                        $turns = array_values(array_filter(
+                            array_map(fn ($u) => trim($u['text']) === '' ? null : [
+                                'speaker' => $speakerMap[$u['speaker']] ?? $u['speaker'],
+                                'text' => $u['text'],
+                            ], $utterances)
+                        ));
+
+                        $transcription->update([
+                            'status' => 'done',
+                            'transcript_text' => implode(' ', array_column($turns, 'text')),
+                            'diarized_transcript' => json_encode($turns),
+                            'analysis_status' => 'processing',
+                        ]);
+
+                        $brief = $this->formatBrief($interview->brief, $interview->expectations ?? '');
+
+                        AnalyseTranscriptionJob::dispatch($transcription, $brief, []);
+                        Log::info('Interview status check: analysis job dispatched', [
+                            'transcription_id' => $transcription->id,
+                            'interview_id' => $interview->id,
+                            'turn_count' => count($turns),
+                        ]);
+
+                        $transcription->refresh();
+                    } elseif ($assemblyStatus === 'error') {
+                        Log::error('Interview status check: AssemblyAI reported error', [
+                            'transcription_id' => $transcription->id,
+                            'interview_id' => $interview->id,
+                            'assemblyai_transcript_id' => $transcription->assemblyai_transcript_id,
+                        ]);
+                        $transcription->update(['status' => 'failed']);
+                    }
+                }
+
+                return $transcription;
+            });
 
             if (! $transcription) {
                 return response()->json(['status' => 'pending', 'analysis_status' => 'pending']);
-            }
-
-            // If transcription is still pending, check AssemblyAI for updates
-            if ($transcription->status === 'pending' && $transcription->assemblyai_transcript_id) {
-                $assemblyStatus = $assemblyAI->checkStatus($transcription->assemblyai_transcript_id);
-
-                if ($assemblyStatus === 'completed') {
-                    // Fetch and process utterances
-                    $utterances = $assemblyAI->fetchUtterances($transcription->assemblyai_transcript_id);
-
-                    $firstSpeaker = $utterances[0]['speaker'] ?? 'A';
-                    $speakerMap = [$firstSpeaker => 'Interviewer'];
-                    foreach ($utterances as $u) {
-                        if (! isset($speakerMap[$u['speaker']])) {
-                            $speakerMap[$u['speaker']] = 'Candidate';
-                        }
-                    }
-
-                    $turns = array_filter(
-                        array_map(fn ($u) => trim($u['text']) === '' ? null : [
-                            'speaker' => $speakerMap[$u['speaker']] ?? $u['speaker'],
-                            'text' => $u['text'],
-                        ], $utterances)
-                    );
-
-                    $diarizedTranscript = implode("\n\n", array_map(fn ($t) => "{$t['speaker']}: {$t['text']}", $turns));
-
-                    $transcription->update([
-                        'status' => 'done',
-                        'transcript_text' => implode(' ', array_column($turns, 'text')),
-                        'diarized_transcript' => $diarizedTranscript,
-                        'analysis_status' => 'processing',
-                    ]);
-
-                    Storage::disk('s3')->delete($transcription->audio_path);
-
-                    $brief = $this->formatBrief($interview->brief, $interview->expectations ?? '');
-
-                    AnalyseTranscriptionJob::dispatch(
-                        $transcription,
-                        $brief,
-                        []
-                    );
-
-                    $transcription->refresh();
-
-                } elseif ($assemblyStatus === 'error') {
-                    $transcription->update(['status' => 'failed']);
-                }
             }
 
             $logger->log('interview.status', 'Consultation du statut de transcription.', ['interview_id' => $interview->id], [Interview::class]);
@@ -471,13 +526,13 @@ class InterviewController extends Controller
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
+        $transcription = $interview->transcription;
+
+        if (! $transcription || ! $transcription->audio_path) {
+            abort(404);
+        }
+
         try {
-            $transcription = $interview->transcription;
-
-            if (! $transcription || ! $transcription->audio_path) {
-                abort(404);
-            }
-
             if (! Storage::disk('s3')->exists($transcription->audio_path)) {
                 abort(404);
             }
@@ -501,6 +556,8 @@ class InterviewController extends Controller
                 'Content-Type' => $mime,
                 'Cache-Control' => 'no-store',
             ]);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Throwable $e) {
             $interviewId = (int) $interview->getKey();
             $logger->log('interview.audio.error', "Erreur lors du streaming audio (ID : {$interviewId}) : ".$e->getMessage(), ['interview_id' => $interviewId, 'exception' => $e->getMessage()], [Interview::class]);

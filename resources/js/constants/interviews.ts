@@ -126,3 +126,25 @@ export const STATUS_BADGE: Record<StatusKey, { cls: string; icon: LucideIcon }> 
     failed: { cls: 'bg-red-50 text-red-800 border-red-200', icon: AlertCircle },
     none: { cls: 'bg-ds-bg3 text-ds-text3 border-ds-border', icon: Minus },
 };
+
+export const PLATFORM_LABEL: Record<string, string> = {
+    zoom: 'Zoom',
+    meet: 'Google Meet',
+    teams: 'Microsoft Teams',
+    presentiel: 'Présentiel',
+};
+
+export const VERDICT_CFG: Record<string, { label: string; cls: string }> = {
+    recommended: { label: 'Recommandé', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+    solid: { label: 'Solide', cls: 'bg-blue-500/10   text-blue-400   border-blue-500/20' },
+    to_deepen: { label: 'À approfondir', cls: 'bg-amber-500/10  text-amber-400  border-amber-500/20' },
+    rejected: { label: 'Non retenu', cls: 'bg-ds-red/10     text-ds-red     border-ds-red/20' },
+};
+
+export const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+    scheduled: { label: 'Planifié', cls: 'bg-blue-500/10  text-blue-400  border-blue-500/20' },
+    recording_uploaded: { label: 'Enregistrement', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+    transcribing: { label: 'Transcription…', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+    analyzed: { label: 'Analysé', cls: 'bg-ds-accent/10 text-ds-accent border-ds-accent/20' },
+    done: { label: 'Terminé', cls: 'bg-ds-text3/10  text-ds-text3  border-ds-text3/20' },
+};

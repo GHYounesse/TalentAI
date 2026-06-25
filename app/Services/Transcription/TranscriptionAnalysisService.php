@@ -53,13 +53,21 @@ class TranscriptionAnalysisService
         string $brief,
         array $otherCandidates = []
     ): array {
+        $start = microtime(true);
+
+        Log::info('TranscriptionAnalysisService: starting analysis', [
+            'model' => self::MODEL,
+            'transcript_length' => mb_strlen($diarizedTranscript),
+            'brief_length' => mb_strlen($brief),
+            'peer_count' => count($otherCandidates),
+        ]);
+
         $systemPrompt = $this->buildSystemPrompt();
         $userPrompt = $this->buildUserPrompt($diarizedTranscript, $brief, $otherCandidates);
 
         $response = Http::withHeaders([
             'Authorization' => "Bearer {$this->apiKey}",
             'Content-Type' => 'application/json',
-            // Recommended by OpenRouter for attribution / abuse prevention
             'HTTP-Referer' => config('app.url'),
             'X-Title' => config('app.name'),
         ])->timeout(120)->post($this->apiUrl, [
@@ -71,22 +79,45 @@ class TranscriptionAnalysisService
             ],
         ]);
 
+        $durationMs = (int) ((microtime(true) - $start) * 1000);
+
         if (! $response->successful()) {
             Log::error('TranscriptionAnalysisService: OpenRouter API error', [
                 'status' => $response->status(),
                 'body' => $response->body(),
+                'duration_ms' => $durationMs,
             ]);
             throw new \RuntimeException(
                 "OpenRouter API returned HTTP {$response->status()}: {$response->body()}"
             );
         }
 
-        // OpenAI-compatible response shape: choices[0].message.content
         $raw = $response->json('choices.0.message.content') ?? '';
+        $finishReason = $response->json('choices.0.finish_reason');
+        $usage = $response->json('usage');
 
         if (empty($raw)) {
+            Log::error('TranscriptionAnalysisService: empty response from OpenRouter', [
+                'finish_reason' => $finishReason,
+                'duration_ms' => $durationMs,
+                'full_body' => $response->body(),
+            ]);
             throw new \RuntimeException('OpenRouter API returned an empty response.');
         }
+
+        if ($finishReason === 'length') {
+            Log::warning('TranscriptionAnalysisService: response truncated by max_tokens', [
+                'max_tokens' => self::MAX_TOKENS,
+                'duration_ms' => $durationMs,
+            ]);
+        }
+
+        Log::info('TranscriptionAnalysisService: OpenRouter responded', [
+            'duration_ms' => $durationMs,
+            'finish_reason' => $finishReason,
+            'usage' => $usage,
+            'response_length' => mb_strlen($raw),
+        ]);
 
         return $this->parseResponse($raw);
     }
@@ -209,16 +240,26 @@ PROMPT;
      */
     private function parseResponse(string $raw): array
     {
-        // Strip accidental markdown fences the model might emit
         $clean = preg_replace('/^```(?:json)?\s*/i', '', trim($raw));
         $clean = preg_replace('/\s*```$/', '', $clean);
 
         $data = json_decode($clean, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! is_array($data)) {
-            Log::error('TranscriptionAnalysisService: JSON parse failure', ['raw' => $raw]);
+            Log::error('TranscriptionAnalysisService: JSON parse failure', [
+                'json_error' => json_last_error_msg(),
+                'raw_length' => mb_strlen($raw),
+                'raw_preview' => mb_substr($raw, 0, 500), // first 500 chars, not the whole payload
+                'raw_tail' => mb_substr($raw, -200), // last 200 chars — often shows truncation
+            ]);
             throw new \RuntimeException('Could not parse API response as JSON: '.json_last_error_msg());
         }
+
+        Log::info('TranscriptionAnalysisService: parsed response successfully', [
+            'global_score' => $data['global_score'] ?? null,
+            'verdict' => $data['verdict'] ?? null,
+            'criteria_count' => count($data['criteria'] ?? []),
+        ]);
 
         return [
             'global_score' => (int) ($data['global_score'] ?? 0),

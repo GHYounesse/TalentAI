@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { CreateInterviewProps, Option, Status } from '@/types/interviews';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, Loader2, Mic, RotateCcw, Sparkles, XCircle } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import Select from 'react-select';
 import { InterviewField } from './components/InterviewField';
@@ -147,6 +147,7 @@ export default function CreateInterview({ candidates, briefs, interviews }: Crea
     const [selectedCandidate, setSelectedCandidate] = useState('');
     const [selectedBrief, setSelectedBrief] = useState('');
     const [platform, setPlatform] = useState<string>('zoom');
+    const [recruiterNotes, setRecruiterNotes] = useState('');
     const [expectations, setExpectations] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [status, setStatus] = useState<Status>('idle');
@@ -156,6 +157,12 @@ export default function CreateInterview({ candidates, briefs, interviews }: Crea
     const inputRef = useRef<HTMLInputElement>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    // Stop polling if the component unmounts mid-poll (e.g. user navigates away)
+    useEffect(() => {
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, []);
     const isWorking = ['uploading', 'pending', 'processing'].includes(status);
     const canSubmit = !!file && !!selectedCandidate && !!selectedBrief && !isWorking;
 
@@ -197,7 +204,7 @@ export default function CreateInterview({ candidates, briefs, interviews }: Crea
 
         router.post(
             '/dashboard/interviews/upload',
-            { audio: file, candidate_id: selectedCandidate, brief_id: selectedBrief, platform, expectations },
+            { audio: file, candidate_id: selectedCandidate, brief_id: selectedBrief, platform, expectations, recruiter_notes: recruiterNotes },
             {
                 forceFormData: true,
                 preserveScroll: true,
@@ -307,6 +314,18 @@ export default function CreateInterview({ candidates, briefs, interviews }: Crea
                                         options={briefs.map((b) => ({ value: b.id, label: b.title }))}
                                         isDisabled={isWorking}
                                         styles={selectStyles}
+                                    />
+                                </InterviewField>
+
+                                <InterviewField label={t('interviews.index.form.recruiter_notes_label')}>
+                                    <textarea
+                                        rows={6}
+                                        cols={50}
+                                        value={recruiterNotes}
+                                        onChange={(e) => setRecruiterNotes(e.target.value)}
+                                        placeholder={t('interviews.index.form.recruiter_notes_placeholder')}
+                                        className="bg-ds-bg placeholder:text-ds-text3 focus:ring-ds-accent w-full rounded-lg border p-4 px-3 py-2 text-[13px] focus:ring-2 focus:outline-none"
+                                        disabled={isWorking}
                                     />
                                 </InterviewField>
 

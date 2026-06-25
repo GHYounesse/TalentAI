@@ -4,6 +4,7 @@ namespace App\Services\Transcription;
 
 use App\Models\UserApiToken;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class AssemblyAIService
@@ -29,7 +30,14 @@ class AssemblyAIService
      */
     public function submit(string $audioUrl): string
     {
+        $start = microtime(true);
+
+        Log::info('AssemblyAIService: submitting transcript', [
+            'audio_url_host' => parse_url($audioUrl, PHP_URL_HOST), // avoid logging the full signed URL
+        ]);
+
         $response = Http::withHeaders($this->headers())
+            ->retry(3, 500)
             ->timeout(30)
             ->post(self::BASE_URL.'/transcript', [
                 'audio_url' => $audioUrl,
@@ -38,15 +46,31 @@ class AssemblyAIService
                 'speakers_expected' => 2,
             ]);
 
+        $durationMs = (int) ((microtime(true) - $start) * 1000);
+
         if ($response->failed()) {
+            Log::error('AssemblyAIService: submit failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'duration_ms' => $durationMs,
+            ]);
             throw new RuntimeException('AssemblyAI submit failed: '.$response->body());
         }
 
         $id = $response->json('id');
 
         if (! $id) {
+            Log::error('AssemblyAIService: submit succeeded but no transcript ID returned', [
+                'body' => $response->body(),
+                'duration_ms' => $durationMs,
+            ]);
             throw new RuntimeException('AssemblyAI did not return a transcript ID.');
         }
+
+        Log::info('AssemblyAIService: transcript submitted', [
+            'assemblyai_transcript_id' => $id,
+            'duration_ms' => $durationMs,
+        ]);
 
         return $id;
     }
@@ -56,15 +80,41 @@ class AssemblyAIService
      */
     public function checkStatus(string $transcriptId): string
     {
+        $start = microtime(true);
+
         $response = Http::withHeaders($this->headers())
+            ->retry(3, 500)
             ->timeout(15)
             ->get(self::BASE_URL.'/transcript/'.$transcriptId);
 
+        $durationMs = (int) ((microtime(true) - $start) * 1000);
+
         if ($response->failed()) {
+            Log::error('AssemblyAIService: status check failed', [
+                'assemblyai_transcript_id' => $transcriptId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'duration_ms' => $durationMs,
+            ]);
             throw new RuntimeException('AssemblyAI status check failed: '.$response->body());
         }
 
-        return $response->json('status') ?? 'error';
+        $status = $response->json('status') ?? 'error';
+
+        Log::debug('AssemblyAIService: status checked', [
+            'assemblyai_transcript_id' => $transcriptId,
+            'assemblyai_status' => $status,
+            'duration_ms' => $durationMs,
+        ]);
+
+        if ($status === 'error') {
+            Log::warning('AssemblyAIService: transcript reported error status', [
+                'assemblyai_transcript_id' => $transcriptId,
+                'error_detail' => $response->json('error'),
+            ]);
+        }
+
+        return $status;
     }
 
     /**
@@ -73,19 +123,40 @@ class AssemblyAIService
      */
     public function fetchUtterances(string $transcriptId): array
     {
+        $start = microtime(true);
+
         $response = Http::withHeaders($this->headers())
+            ->retry(3, 500)
             ->timeout(30)
             ->get(self::BASE_URL.'/transcript/'.$transcriptId);
 
+        $durationMs = (int) ((microtime(true) - $start) * 1000);
+
         if ($response->failed()) {
+            Log::error('AssemblyAIService: fetchUtterances failed', [
+                'assemblyai_transcript_id' => $transcriptId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'duration_ms' => $durationMs,
+            ]);
             throw new RuntimeException('AssemblyAI fetch failed: '.$response->body());
         }
 
         $utterances = $response->json('utterances') ?? [];
 
         if (empty($utterances)) {
+            Log::error('AssemblyAIService: completed transcript has no utterances', [
+                'assemblyai_transcript_id' => $transcriptId,
+                'duration_ms' => $durationMs,
+            ]);
             throw new RuntimeException('AssemblyAI returned no utterances.');
         }
+
+        Log::info('AssemblyAIService: utterances fetched', [
+            'assemblyai_transcript_id' => $transcriptId,
+            'utterance_count' => count($utterances),
+            'duration_ms' => $durationMs,
+        ]);
 
         return array_map(fn ($u) => [
             'speaker' => $u['speaker'],

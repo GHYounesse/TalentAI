@@ -72,5 +72,8 @@ return [
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
     ],
+    'lusha' => [
+        'api_key' => env('LUSHA_API_KEY'),
+    ],
 
 ];
