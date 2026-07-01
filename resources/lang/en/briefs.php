@@ -196,6 +196,7 @@ return [
             'view' => 'View',
             'edit' => 'Edit',
             'delete' => 'Delete',
+            'update_status' => 'Update status',
         ],
 
         'filters' => [
@@ -257,6 +258,48 @@ return [
             'education' => 'Education Level',
             'created_at' => 'Created At',
             'actions' => 'Actions',
+            'position' => 'Target Position',
+            'experience' => 'Experience',
+            'location' => 'Location',
+            'created' => 'Created',
+        ],
+        'pagination' => [
+            'range' => '{{from}}–{{to}} of {{total}} briefs',
+            'total' => '{{total}} briefs',
+            'previous' => 'Previous page',
+            'next' => 'Next page',
+        ],
+
+        'bulk' => [
+            'selected_count' => '{{count}} selected',
+            'status_placeholder' => 'Change status...',
+            'apply' => 'Apply',
+            'delete_selection' => 'Delete selection',
+            'cancel_selection' => 'Cancel',
+            'delete_label' => '{{count}} brief(s)',
+        ],
+
+        'toast' => [
+            'deleted' => '"{{title}}" deleted.',
+            'undo' => 'Undo',
+            'restored' => 'Brief restored.',
+            'restore_error' => 'Unable to restore this brief.',
+            'bulk_deleted' => 'Briefs deleted.',
+            'bulk_delete_error' => 'Error while deleting selection.',
+            'bulk_status_updated' => 'Statuses updated.',
+            'bulk_status_error' => 'Error while updating statuses.',
+        ],
+
+        'row' => [
+            'years_exp' => '{{count}} yrs exp.',
+            'years' => '{{count}} yrs',
+        ],
+
+        'status' => [
+            'active' => 'Active',
+            'draft' => 'Draft',
+            'sourcing' => 'Sourcing',
+            'interview' => 'Interviews',
         ],
 
         'gender' => [

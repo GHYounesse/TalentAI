@@ -460,8 +460,7 @@ class BriefController extends Controller
                 [Brief::class]
             );
 
-            return redirect()->route('dashboard.briefs.index')
-                ->with('success', 'Brief supprimé avec succès.');
+            return back()->with('success', 'Brief supprimé avec succès.');
         } catch (\Throwable $e) {
             $logger->log(
                 'brief.destroy.error',
@@ -588,5 +587,58 @@ class BriefController extends Controller
                 'brief' => $brief,
             ]);
         }
+    }
+
+    public function restore(Brief $brief): RedirectResponse
+    {
+        $brief->restore();
+
+        app(ActivityLogger::class)->log(
+            'brief.restore',
+            "Restauration du brief « {$brief->title} » (ID : {$brief->id}).",
+            ['brief_id' => $brief->id],
+            [Brief::class]
+        );
+
+        return back()->with('success', 'Brief restauré.');
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:briefs,id',
+        ]);
+
+        Brief::whereIn('id', $validated['ids'])->delete();
+
+        app(ActivityLogger::class)->log(
+            'brief.bulk_destroy',
+            'Suppression groupée de '.count($validated['ids']).' brief(s).',
+            ['brief_ids' => $validated['ids']],
+            [Brief::class]
+        );
+
+        return back()->with('success', count($validated['ids']).' brief(s) supprimé(s).');
+    }
+
+    public function bulkUpdateStatus(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:briefs,id',
+            'status' => ['required', Rule::enum(BriefStatus::class)],
+        ]);
+
+        Brief::whereIn('id', $validated['ids'])->update(['status' => $validated['status']]);
+
+        app(ActivityLogger::class)->log(
+            'brief.bulk_status_update',
+            'Mise à jour groupée du statut pour '.count($validated['ids']).' brief(s).',
+            ['brief_ids' => $validated['ids'], 'status' => $validated['status']],
+            [Brief::class]
+        );
+
+        return back()->with('success', 'Statut mis à jour pour '.count($validated['ids']).' brief(s).');
     }
 }

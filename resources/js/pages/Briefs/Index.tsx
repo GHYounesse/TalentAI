@@ -17,18 +17,6 @@ import ReactSelect from 'react-select';
 dayjs.extend(relativeTime);
 dayjs.locale('fr');
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-    active: { label: 'Actif', className: 'bg-badge-active-bg text-badge-active-text border border-badge-active-text/20' },
-    draft: { label: 'Brouillon', className: 'bg-ds-accent/10 text-ds-accent2 border border-ds-accent/20' },
-    sourcing: { label: 'En sourcing', className: 'bg-badge-sourcing-bg text-badge-sourcing-text border border-badge-sourcing-text/20' },
-    interview: { label: 'Entretiens', className: 'bg-badge-interview-bg text-badge-interview-text border border-badge-interview-text/20' },
-};
-
-function BriefStatusBadge({ status }: { status: string }) {
-    const cfg = STATUS_CONFIG[status] ?? { label: status, className: 'bg-ds-bg3 text-ds-text2 border border-ds-border' };
-    return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${cfg.className}`}>{cfg.label}</span>;
-}
-
 const AVATAR_COLORS = [
     'from-[#6C63FF] to-[#38BDF8]',
     'from-[#34D399] to-[#38BDF8]',
@@ -70,6 +58,7 @@ interface PaginationMeta {
 }
 
 function Pagination({ meta, filters }: { meta: PaginationMeta; filters: FilterEntry[] }) {
+    const { t } = useI18n();
     const { current_page, last_page, from, to, total } = meta;
     if (last_page <= 1) return null;
 
@@ -91,14 +80,16 @@ function Pagination({ meta, filters }: { meta: PaginationMeta; filters: FilterEn
 
     return (
         <div className="mt-4 flex items-center justify-between text-[13px]">
-            <p className="text-ds-text3">{from != null && to != null ? `${from}–${to} sur ${total} briefs` : `${total} briefs`}</p>
+            <p className="text-ds-text3">
+                {from != null && to != null ? t('briefs.index.pagination.range', { from, to, total }) : t('briefs.index.pagination.total', { total })}
+            </p>
 
             <div className="flex items-center gap-1">
                 <button
                     onClick={() => goTo(current_page - 1)}
                     disabled={current_page === 1}
                     className={`${btnBase} ${current_page === 1 ? btnDisabled : btnIdle}`}
-                    aria-label="Page précédente"
+                    aria-label={t('briefs.index.pagination.previous')}
                 >
                     <ChevronLeft size={13} />
                 </button>
@@ -120,7 +111,7 @@ function Pagination({ meta, filters }: { meta: PaginationMeta; filters: FilterEn
                     onClick={() => goTo(current_page + 1)}
                     disabled={current_page === last_page}
                     className={`${btnBase} ${current_page === last_page ? btnDisabled : btnIdle}`}
-                    aria-label="Page suivante"
+                    aria-label={t('briefs.index.pagination.next')}
                 >
                     <ChevronRight size={13} />
                 </button>
@@ -129,6 +120,66 @@ function Pagination({ meta, filters }: { meta: PaginationMeta; filters: FilterEn
     );
 }
 
+function FilterChips({
+    filters,
+    fields,
+    onRemove,
+}: {
+    filters: FilterEntry[];
+    fields: { key: string; label: string }[];
+    onRemove: (field: string) => void;
+}) {
+    const active = filters.filter((f) => (Array.isArray(f.value) ? f.value.length > 0 : f.value && (f.value as string).trim() !== ''));
+    if (active.length === 0) return null;
+
+    return (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+            {active.map((f) => {
+                const label = fields.find((field) => field.key === f.field)?.label ?? f.field;
+                const displayValue = Array.isArray(f.value) ? f.value.join(', ') : f.value;
+                return (
+                    <span
+                        key={f.field}
+                        className="bg-ds-accent/10 text-ds-accent2 border-ds-accent/20 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium"
+                    >
+                        {label}: {displayValue}
+                        <button onClick={() => onRemove(f.field)} className="hover:text-ds-accent">
+                            <X size={12} />
+                        </button>
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
+
+function useStatusConfig() {
+    const { t } = useI18n();
+    return useMemo<Record<string, { label: string; className: string }>>(
+        () => ({
+            active: {
+                label: t('briefs.index.status.active'),
+                className: 'bg-badge-active-bg text-badge-active-text border border-badge-active-text/20',
+            },
+            draft: { label: t('briefs.index.status.draft'), className: 'bg-ds-accent/10 text-ds-accent2 border border-ds-accent/20' },
+            sourcing: {
+                label: t('briefs.index.status.sourcing'),
+                className: 'bg-badge-sourcing-bg text-badge-sourcing-text border border-badge-sourcing-text/20',
+            },
+            interview: {
+                label: t('briefs.index.status.interview'),
+                className: 'bg-badge-interview-bg text-badge-interview-text border border-badge-interview-text/20',
+            },
+        }),
+        [t],
+    );
+}
+
+function BriefStatusBadge({ status }: { status: string }) {
+    const STATUS_CONFIG = useStatusConfig();
+    const cfg = STATUS_CONFIG[status] ?? { label: status, className: 'bg-ds-bg3 text-ds-text2 border border-ds-border' };
+    return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${cfg.className}`}>{cfg.label}</span>;
+}
 export default function Index({ briefs, filters, params, brief_statuses }: IndexBriefProps) {
     const { t } = useI18n();
 
@@ -139,9 +190,16 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
     const [newStatus, setNewStatus] = useState<string>('');
     const [updatingStatus, setUpdatingStatus] = useState(false);
 
-    const [deletingBrief, setDeletingBrief] = useState<Brief | null>(null);
     const [loading, setLoading] = useState(false);
     const [activeFilters, setActiveFilters] = useState<FilterEntry[]>(Array.isArray(filters) ? filters : []);
+    const [pendingId, setPendingId] = useState<number | null>(null);
+
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [bulkStatus, setBulkStatus] = useState<string>('');
+    const [bulkPending, setBulkPending] = useState(false);
+    const allOnPageSelected = briefs.data.length > 0 && briefs.data.every((b) => selectedIds.has(b.id));
+
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
     const FILTER_FIELDS = useMemo(
         () => [
@@ -185,6 +243,7 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
     function handleUpdateStatus() {
         if (!statusBrief) return;
         setUpdatingStatus(true);
+        setPendingId(statusBrief.id);
         router.post(
             route('dashboard.briefs.updateStatus', statusBrief.id),
             { status: newStatus },
@@ -193,17 +252,94 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                     setStatusBrief(null);
                 },
                 onError: () => toast.error(t('briefs.index.flash.status_error')),
-                onFinish: () => setUpdatingStatus(false),
+                onFinish: () => {
+                    setUpdatingStatus(false);
+                    setPendingId(null);
+                },
             },
         );
     }
 
-    function handleDelete() {
-        if (!deletingBrief) return;
-        router.delete(route('dashboard.briefs.destroy', deletingBrief.id), {
-            onSuccess: () => setDeletingBrief(null),
+    function handleDeleteWithUndo(brief: Brief) {
+        setPendingId(brief.id);
+        router.delete(route('dashboard.briefs.destroy', brief.id), {
+            onSuccess: () => {
+                toast.custom(
+                    (tst) => (
+                        <div className="bg-ds-surface border-ds-border flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg">
+                            <span className="text-ds-text text-sm">{t('briefs.index.toast.deleted', { title: brief.title })}</span>
+                            <button
+                                onClick={() => {
+                                    router.post(
+                                        route('dashboard.briefs.restore', brief.id),
+                                        {},
+                                        {
+                                            onSuccess: () => toast.success(t('briefs.index.toast.restored')),
+                                            onError: () => toast.error(t('briefs.index.toast.restore_error')),
+                                        },
+                                    );
+                                    toast.dismiss(tst.id);
+                                }}
+                                className="text-ds-accent text-sm font-semibold hover:underline"
+                            >
+                                {t('briefs.index.toast.undo')}
+                            </button>
+                        </div>
+                    ),
+                    { duration: 6000 },
+                );
+            },
             onError: () => toast.error(t('briefs.index.flash.delete_error')),
+            onFinish: () => setPendingId(null),
         });
+    }
+
+    function toggleAll() {
+        setSelectedIds(allOnPageSelected ? new Set() : new Set(briefs.data.map((b) => b.id)));
+    }
+
+    function toggleOne(id: number) {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }
+
+    function handleBulkDelete() {
+        setBulkPending(true);
+        router.delete(route('dashboard.briefs.bulkDestroy'), {
+            data: { ids: Array.from(selectedIds) },
+            onSuccess: () => {
+                toast.success(t('briefs.index.toast.bulk_deleted'));
+                setSelectedIds(new Set());
+                setShowBulkDeleteModal(false);
+            },
+            onError: () => toast.error(t('briefs.index.toast.bulk_delete_error')),
+            onFinish: () => setBulkPending(false),
+        });
+    }
+
+    function handleBulkStatus() {
+        if (!bulkStatus) return;
+        setBulkPending(true);
+        router.post(
+            route('dashboard.briefs.bulkUpdateStatus'),
+            { ids: Array.from(selectedIds), status: bulkStatus },
+            {
+                onSuccess: () => {
+                    toast.success(t('briefs.index.toast.bulk_status_updated'));
+                    setSelectedIds(new Set());
+                    setBulkStatus('');
+                },
+                onError: () => toast.error(t('briefs.index.toast.bulk_status_error')),
+                onFinish: () => setBulkPending(false),
+            },
+        );
     }
 
     function handleSearch(filtersOverride?: FilterEntry[]) {
@@ -261,6 +397,15 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                             </Link>
                         )}
                     </div>
+                    <FilterChips
+                        filters={activeFilters}
+                        fields={FILTER_FIELDS}
+                        onRemove={(field) => {
+                            const updated = activeFilters.filter((f) => f.field !== field);
+                            setActiveFilters(updated);
+                            handleSearch(updated);
+                        }}
+                    />
 
                     {/* Skeleton while loading */}
                     {loading && <SkeletonTable cols={8} rows={8} />}
@@ -285,6 +430,42 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                         </div>
                     )}
 
+                    {selectedIds.size > 0 && (
+                        <div className="border-ds-border bg-ds-surface mb-3 flex items-center gap-3 rounded-xl border px-4 py-2.5">
+                            <span className="text-ds-text text-[13px] font-medium">
+                                {t('briefs.index.bulk.selected_count', { count: selectedIds.size })}
+                            </span>
+
+                            <ReactSelect
+                                classNamePrefix="rs"
+                                className="min-w-[180px]"
+                                placeholder={t('briefs.index.bulk.status_placeholder')}
+                                options={brief_statuses}
+                                value={brief_statuses.find((o) => o.value === bulkStatus) ?? null}
+                                onChange={(option) => setBulkStatus(option?.value ?? '')}
+                                isSearchable={false}
+                            />
+                            <button
+                                onClick={handleBulkStatus}
+                                disabled={!bulkStatus || bulkPending}
+                                className="bg-ds-accent rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+                            >
+                                {t('briefs.index.bulk.apply')}
+                            </button>
+
+                            <button
+                                onClick={() => setShowBulkDeleteModal(true)}
+                                disabled={bulkPending}
+                                className="border-ds-red/40 text-ds-red ml-auto rounded-lg border px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+                            >
+                                {t('briefs.index.bulk.delete_selection')}
+                            </button>
+
+                            <button onClick={() => setSelectedIds(new Set())} className="text-ds-text3 text-[12px] hover:underline">
+                                {t('briefs.index.bulk.cancel_selection')}
+                            </button>
+                        </div>
+                    )}
                     {/* Table */}
                     {!loading && briefs.data.length > 0 && (
                         <div className="border-ds-border bg-ds-surface overflow-hidden rounded-xl border">
@@ -292,9 +473,21 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                                 <table className="w-full border-collapse text-[13px]">
                                     <thead>
                                         <tr className="border-ds-border border-b">
-                                            {['POSTE VISÉ', 'SECTEUR', 'CONTRAT', 'EXPÉRIENCE', 'LOCALISATION', 'STATUT', 'CRÉÉ', ''].map((col) => (
+                                            <th className="w-10 px-4 py-3">
+                                                <input type="checkbox" checked={allOnPageSelected} onChange={toggleAll} />
+                                            </th>
+                                            {[
+                                                t('briefs.index.columns.position'),
+                                                t('briefs.index.columns.sector'),
+                                                t('briefs.index.columns.contract'),
+                                                t('briefs.index.columns.experience'),
+                                                t('briefs.index.columns.location'),
+                                                t('briefs.index.columns.status'),
+                                                t('briefs.index.columns.created'),
+                                                '',
+                                            ].map((col, i) => (
                                                 <th
-                                                    key={col}
+                                                    key={i}
                                                     className="text-ds-text3 px-4 py-3 text-left text-[10px] font-semibold tracking-[0.8px] uppercase"
                                                 >
                                                     {col}
@@ -309,12 +502,16 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                                                 className="border-ds-border hover:bg-ds-bg3/40 border-b transition-colors last:border-0"
                                             >
                                                 <td className="px-4 py-3.5">
+                                                    <input type="checkbox" checked={selectedIds.has(brief.id)} onChange={() => toggleOne(brief.id)} />
+                                                </td>
+                                                <td className="px-4 py-3.5">
                                                     <div className="flex items-center gap-3">
                                                         <BriefAvatar title={brief.title} index={index} />
                                                         <div className="min-w-0">
                                                             <p className="font-heading text-ds-text truncate font-semibold">{brief.title}</p>
                                                             <p className="text-ds-text3 truncate text-[11px]">
-                                                                {brief.location} · {brief.min_experience_years} ans exp.
+                                                                {brief.location} ·{' '}
+                                                                {t('briefs.index.row.years_exp', { count: brief.min_experience_years })}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -323,46 +520,55 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                                                 <td className="px-4 py-3.5">
                                                     <ContractBadge type={brief.contract_type} />
                                                 </td>
-                                                <td className="text-ds-text2 px-4 py-3.5">{brief.min_experience_years} ans</td>
+                                                <td className="text-ds-text2 px-4 py-3.5">
+                                                    {t('briefs.index.row.years', { count: brief.min_experience_years })}
+                                                </td>
                                                 <td className="text-ds-text2 px-4 py-3.5">{brief.location}</td>
                                                 <td className="px-4 py-3.5">
                                                     <BriefStatusBadge status={brief.status} />
                                                 </td>
                                                 <td className="text-ds-text3 px-4 py-3.5 text-[12px]">{dayjs(brief.created_at).fromNow()}</td>
                                                 <td className="px-4 py-3.5">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <button
-                                                            onClick={() => {
-                                                                setStatusBrief(brief);
-                                                                setNewStatus(brief.status);
-                                                            }}
-                                                            className="border-ds-border text-ds-text3 hover:border-ds-accent hover:text-ds-accent flex h-7 w-7 items-center justify-center rounded-lg border transition"
-                                                            title="Modifier statut"
-                                                        >
-                                                            <RefreshCw size={13} />
-                                                        </button>
-                                                        <Link
-                                                            href={route('dashboard.briefs.show', brief.id)}
-                                                            className="border-ds-border text-ds-text3 hover:border-ds-border2 hover:text-ds-text flex h-7 w-7 items-center justify-center rounded-lg border transition"
-                                                            title={t('briefs.index.actions.view')}
-                                                        >
-                                                            <Eye size={13} />
-                                                        </Link>
-                                                        <Link
-                                                            href={route('dashboard.briefs.edit', brief.id)}
-                                                            className="border-ds-border text-ds-text3 hover:border-ds-amber/40 hover:text-ds-amber flex h-7 w-7 items-center justify-center rounded-lg border transition"
-                                                            title={t('briefs.index.actions.edit')}
-                                                        >
-                                                            <Edit2 size={13} />
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => setDeletingBrief(brief)}
-                                                            className="border-ds-border text-ds-text3 hover:border-ds-red/40 hover:text-ds-red flex h-7 w-7 items-center justify-center rounded-lg border transition"
-                                                            title={t('briefs.index.actions.delete')}
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </div>
+                                                    {(() => {
+                                                        const isPending = pendingId === brief.id;
+                                                        return (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setStatusBrief(brief);
+                                                                        setNewStatus(brief.status);
+                                                                    }}
+                                                                    disabled={isPending}
+                                                                    className="border-ds-border text-ds-text3 hover:border-ds-accent hover:text-ds-accent flex h-7 w-7 items-center justify-center rounded-lg border transition disabled:opacity-40"
+                                                                    title={t('briefs.index.actions.update_status')}
+                                                                >
+                                                                    <RefreshCw size={13} className={isPending ? 'animate-spin' : ''} />
+                                                                </button>
+                                                                <Link
+                                                                    href={route('dashboard.briefs.show', brief.id)}
+                                                                    className={`border-ds-border text-ds-text3 hover:border-ds-red/40 hover:text-ds-red flex h-7 w-7 items-center justify-center rounded-lg border transition ${isPending ? 'pointer-events-none opacity-40' : ''}`}
+                                                                    title={t('briefs.index.actions.view')}
+                                                                >
+                                                                    <Eye size={13} />
+                                                                </Link>
+                                                                <Link
+                                                                    href={route('dashboard.briefs.edit', brief.id)}
+                                                                    className={`border-ds-border text-ds-text3 hover:border-ds-red/40 hover:text-ds-red flex h-7 w-7 items-center justify-center rounded-lg border transition ${isPending ? 'pointer-events-none opacity-40' : ''}`}
+                                                                    title={t('briefs.index.actions.edit')}
+                                                                >
+                                                                    <Edit2 size={13} />
+                                                                </Link>
+                                                                <button
+                                                                    onClick={() => handleDeleteWithUndo(brief)}
+                                                                    disabled={isPending}
+                                                                    className={`border-ds-border text-ds-text3 hover:border-ds-red/40 hover:text-ds-red flex h-7 w-7 items-center justify-center rounded-lg border transition ${isPending ? 'pointer-events-none opacity-40' : ''}`}
+                                                                    title={t('briefs.index.actions.delete')}
+                                                                >
+                                                                    <Trash2 size={13} />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                             </tr>
                                         ))}
@@ -377,12 +583,12 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
                         </div>
                     )}
 
-                    {deletingBrief && (
+                    {showBulkDeleteModal && (
                         <DeleteModal
-                            label={deletingBrief.title}
+                            label={t('briefs.index.bulk.delete_label', { count: selectedIds.size })}
                             i18nPrefix="briefs.index.modal"
-                            onConfirm={handleDelete}
-                            onCancel={() => setDeletingBrief(null)}
+                            onConfirm={handleBulkDelete}
+                            onCancel={() => setShowBulkDeleteModal(false)}
                         />
                     )}
                 </div>

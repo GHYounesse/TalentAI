@@ -19,6 +19,14 @@ Route::middleware('can:briefs.edit')->group(function () {
     Route::put('/briefs/{brief}', [BriefController::class, 'update'])->name('briefs.update');
 });
 
+Route::delete('briefs/bulk', [BriefController::class, 'bulkDestroy'])
+    ->name('briefs.bulkDestroy')
+    ->middleware('can:briefs.delete');
+
+Route::post('briefs/bulk/status', [BriefController::class, 'bulkUpdateStatus'])
+    ->name('briefs.bulkUpdateStatus')
+    ->middleware('can:briefs.edit');
+
 Route::delete('/briefs/{brief}', [BriefController::class, 'destroy'])
     ->name('briefs.destroy')
     ->middleware('can:briefs.delete');
@@ -28,6 +36,8 @@ Route::post('/briefs/{brief}/activate', [BriefController::class, 'activate'])->n
 Route::post('/briefs/{brief}/status', [BriefController::class, 'updateStatus'])
     ->name('briefs.updateStatus')
     ->middleware('can:briefs.edit');
+
+Route::post('briefs/{brief}/restore', [BriefController::class, 'restore'])->name('briefs.restore')->withTrashed()->middleware('can:briefs.edit');
 
 Route::post('briefs/import', [BriefImportController::class, 'extractFromFile'])
     ->name('briefs.import');

@@ -197,6 +197,7 @@ return [
             'view' => 'Voir',
             'edit' => 'Modifier',
             'delete' => 'Supprimer',
+            'update_status' => 'Modifier statut',
         ],
 
         'filters' => [
@@ -258,6 +259,47 @@ return [
             'education' => 'Niveau d\'études',
             'created_at' => 'Créé le',
             'actions' => 'Actions',
+            'position' => 'Poste visé',
+            'experience' => 'Expérience',
+            'location' => 'Localisation',
+            'created' => 'Créé',
+        ],
+        'pagination' => [
+            'range' => '{{from}}–{{to}} sur {{total}} briefs',
+            'total' => '{{total}} briefs',
+            'previous' => 'Page précédente',
+            'next' => 'Page suivante',
+        ],
+
+        'bulk' => [
+            'selected_count' => '{{count}} sélectionné(s)',
+            'status_placeholder' => 'Changer le statut...',
+            'apply' => 'Appliquer',
+            'delete_selection' => 'Supprimer la sélection',
+            'cancel_selection' => 'Annuler',
+            'delete_label' => '{{count}} brief(s)',
+        ],
+        'toast' => [
+            'deleted' => '« {{title}} » supprimé.',
+            'undo' => 'Annuler',
+            'restored' => 'Brief restauré.',
+            'restore_error' => 'Impossible de restaurer ce brief.',
+            'bulk_deleted' => 'Briefs supprimés.',
+            'bulk_delete_error' => 'Erreur lors de la suppression groupée.',
+            'bulk_status_updated' => 'Statuts mis à jour.',
+            'bulk_status_error' => 'Erreur lors de la mise à jour groupée.',
+        ],
+
+        'row' => [
+            'years_exp' => '{{count}} ans exp.',
+            'years' => '{{count}} ans',
+        ],
+
+        'status' => [
+            'active' => 'Actif',
+            'draft' => 'Brouillon',
+            'sourcing' => 'En sourcing',
+            'interview' => 'Entretiens',
         ],
 
         'gender' => [
