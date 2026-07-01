@@ -114,6 +114,15 @@ class ParameterSeeder extends Seeder
                     ['value' => 'F',   'label' => 'Femme',       'order' => 3],
                 ],
             ],
+            'sourcing_social_platforms' => [
+                'label' => 'Sourcing social platforms',
+                'system' => false,
+                'values' => [
+                    ['value' => 'https://www.linkedin.com/company/dreamjob.ma',       'label' => 'DreamJob',        'order' => 1],
+                    ['value' => 'https://www.linkedin.com/company/emploi-ma',       'label' => 'Emploi-ma',        'order' => 2],
+                    ['value' => 'https://www.linkedin.com/company/wadifatyma', 'label' => 'Wadifatyma',  'order' => 3],
+                ],
+            ],
 
         ];
 

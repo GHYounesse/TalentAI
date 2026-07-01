@@ -15,9 +15,25 @@ class Integration extends Model
         'docs_url', 'oauth', 'is_active', 'is_system',
     ];
 
-    protected $casts = [
-        'oauth' => 'boolean',
-        'is_active' => 'boolean',
-        'is_system' => 'boolean',
-    ];
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'api_token' => 'encrypted',
+            'active' => 'boolean',
+            'credits_used' => 'integer',
+            'credits_limit' => 'integer',
+            'token_expires_at' => 'datetime',
+            'created_at' => 'datetime',
+        ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

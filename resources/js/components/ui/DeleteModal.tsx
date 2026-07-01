@@ -1,14 +1,22 @@
 import { useI18n } from '@/hooks/useI18n';
+import { useState } from 'react';
 
 interface DeleteModalProps {
-    label: string;       
-    i18nPrefix?: string;  
+    label: string;
+    i18nPrefix?: string;
     onConfirm: () => void;
     onCancel: () => void;
 }
 
 export default function DeleteModal({ label, i18nPrefix = 'common.modal.delete', onConfirm, onCancel }: DeleteModalProps) {
     const { t } = useI18n();
+    const [submitting, setSubmitting] = useState(false);
+
+    function handleConfirm() {
+        if (submitting) return;
+        setSubmitting(true);
+        onConfirm();
+    }
 
     return (
         <div
@@ -46,8 +54,9 @@ export default function DeleteModal({ label, i18nPrefix = 'common.modal.delete',
                         {t(`${i18nPrefix}.cancel`)}
                     </button>
                     <button
-                        onClick={onConfirm}
-                        className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+                        onClick={handleConfirm}
+                        disabled={submitting}
+                        className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {t(`${i18nPrefix}.confirm`)}
                     </button>

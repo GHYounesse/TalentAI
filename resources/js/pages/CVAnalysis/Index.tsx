@@ -2,6 +2,7 @@ import FilterPanel, { FilterEntry } from '@/components/ui/FilterPanel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/hooks/useI18n';
 import AppLayout from '@/layouts/app-layout';
+import { safeUrl } from '@/lib/utils';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Download, FileSearch, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -355,8 +356,9 @@ export default function Index() {
 
                                     {/* actions */}
                                     <a
-                                        href={selected.cv_file_path}
+                                        href={safeUrl(selected.cv_file_path)}
                                         target="_blank"
+                                        rel="noopener noreferrer"
                                         className="bg-ds-accent flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
                                     >
                                         <Download size={14} />

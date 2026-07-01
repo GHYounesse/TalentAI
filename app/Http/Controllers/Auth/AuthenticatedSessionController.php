@@ -65,8 +65,8 @@ class AuthenticatedSessionController extends Controller
         } catch (\Throwable $e) {
             $logger->log(
                 'session.store.error',
-                'Erreur lors de la tentative de connexion : '.$e->getMessage(),
-                ['email' => $request->email, 'exception' => $e->getMessage()]
+                'Échec de tentative de connexion.',
+                []
             );
 
             throw $e;

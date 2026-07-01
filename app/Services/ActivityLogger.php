@@ -70,11 +70,15 @@ class ActivityLogger
      */
     private function sanitizeRequestData(array $data): array
     {
-        $sensitive = ['password', 'password_confirmation', 'token', 'secret', 'api_key', 'credit_card'];
+        $sensitive = ['password', 'password_confirmation', 'current_password', 'token', 'secret', 'api_key', 'credit_card'];
 
-        foreach ($sensitive as $key) {
-            if (array_key_exists($key, $data)) {
+        foreach ($data as $key => $value) {
+            if (in_array($key, $sensitive, true)) {
                 $data[$key] = '***';
+            } elseif (is_array($value)) {
+                $data[$key] = $this->sanitizeRequestData($value);
+            } elseif (is_string($value) && strlen($value) > 1000) {
+                $data[$key] = substr($value, 0, 1000).'…[truncated]';
             }
         }
 

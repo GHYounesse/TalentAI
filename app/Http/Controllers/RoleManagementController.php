@@ -248,7 +248,7 @@ class RoleManagementController extends Controller
                 ->when($email, fn ($q) => $q->where('email', 'like', "%{$email}%"))
                 ->when($role, fn ($q) => $q->whereHas('roles', fn ($r) => $r->where('name', $role)))
                 ->latest()
-                ->paginate(20)
+                ->paginate(100)
                 ->withQueryString()
                 ->through(fn ($user) => [
                     'id' => $user->id,

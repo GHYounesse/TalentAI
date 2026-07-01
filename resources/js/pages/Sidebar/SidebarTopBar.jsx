@@ -46,12 +46,11 @@ export default function SidebarTopBar({ setMobileOpen }) {
 
                     {/* Locale selector */}
                     <Select
-                        value={locale}
+                        value={locale ?? 'fr'}
                         onChange={setLang}
                         placeholder="FR"
                         options={[
                             { value: 'fr', label: 'FR' },
-                            { value: 'ar', label: 'AR' },
                             { value: 'en', label: 'EN' },
                         ]}
                     />

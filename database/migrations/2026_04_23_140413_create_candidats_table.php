@@ -27,14 +27,8 @@ return new class extends Migration
             $table->string('source')->default('apify');
             $table->json('raw_data')->nullable();
             $table->string('source_url')->nullable();
-            $table->enum('status', [
-                'sourced',
-                'contacted',
-                'interview',
-                'recommended',
-                'offer',
-                'rejected',
-            ])->default('sourced');
+            $table->json('source_context')->nullable();
+            $table->string('status', 100)->default('sourced');
             $table->timestamps();
             $table->softDeletes();
         });

@@ -1,6 +1,7 @@
 import { InterviewCard } from '@/components/Candidats/InterviewCard';
 import { useI18n } from '@/hooks/useI18n';
 import AppLayout from '@/layouts/app-layout';
+import { safeUrl } from '@/lib/utils';
 import { CandidatHistoryProps } from '@/types/candidat';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Briefcase, Calendar, ChevronLeft, ExternalLink, MapPin } from 'lucide-react';
@@ -90,7 +91,7 @@ export default function Historique({ candidat, interviews }: CandidatHistoryProp
                             {/* LinkedIn */}
                             {candidat.linkedin_url && (
                                 <a
-                                    href={candidat.linkedin_url}
+                                    href={safeUrl(candidat.linkedin_url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="border-ds-border text-ds-text3 hover:border-ds-accent/40 hover:text-ds-accent mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border py-2 text-[12px] font-medium transition"

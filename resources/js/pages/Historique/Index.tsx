@@ -3,6 +3,7 @@ import { AVATAR_COLORS } from '@/constants/historique';
 import { PLATFORM_LABEL } from '@/constants/interviews';
 import { useI18n } from '@/hooks/useI18n';
 import AppLayout from '@/layouts/app-layout';
+import { safeUrl } from '@/lib/utils';
 import { PaginatedInterviews, Props } from '@/types/historique';
 import { entriesToParams, filtersToEntries, formatDate, scoreColor } from '@/utils/historique';
 import { Head, Link, router } from '@inertiajs/react';
@@ -251,9 +252,9 @@ export default function HistoriqueIndex({ interviews, briefs, filters: initialFi
                                                                     </p>
                                                                     {interview.candidat.linkedin_url && (
                                                                         <a
-                                                                            href={interview.candidat.linkedin_url}
+                                                                            href={safeUrl(interview.candidat.linkedin_url)}
                                                                             target="_blank"
-                                                                            rel="noreferrer"
+                                                                            rel="noopener noreferrer"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             className="text-ds-text3 shrink-0 transition hover:text-[#818CF8]"
                                                                         >

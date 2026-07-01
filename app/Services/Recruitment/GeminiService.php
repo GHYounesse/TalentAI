@@ -3,7 +3,6 @@
 namespace App\Services\Recruitment;
 
 use App\Models\Brief;
-use App\Models\UserApiToken;
 use App\Services\ActivityLogger;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -129,7 +128,6 @@ class GeminiService
 
     private function callGemini(string $prompt, ActivityLogger $logger): array
     {
-        Log::info('GEMINI START');
         $logger->log('gemini.request', 'Appel Gemini API', [], []);
 
         $response = Http::withHeaders([
@@ -142,9 +140,6 @@ class GeminiService
                     'parts' => [['text' => $prompt]],
                 ]],
             ]);
-
-        Log::info('GEMINI STATUS', ['status' => $response->status()]);
-        Log::info('GEMINI RAW RESPONSE', ['body' => $response->body()]);
 
         if (! $response->successful()) {
             $logger->log('gemini.error', 'API Gemini failed', ['status' => $response->status()], []);
@@ -164,7 +159,6 @@ class GeminiService
 
     private function callOpenRouterFallback(string $prompt, ActivityLogger $logger): array
     {
-        Log::info('OPENROUTER FALLBACK START');
         $logger->log('openrouter.fallback.request', 'Appel OpenRouter fallback (Gemini indisponible)', [], []);
 
         $response = Http::withHeaders([
@@ -178,9 +172,6 @@ class GeminiService
             ],
             'max_tokens' => 4000,
         ]);
-
-        Log::info('OPENROUTER FALLBACK STATUS', ['status' => $response->status()]);
-        Log::info('OPENROUTER FALLBACK RESPONSE', ['body' => $response->body()]);
 
         if (! $response->successful()) {
             $logger->log('openrouter.fallback.error', 'OpenRouter fallback failed', ['status' => $response->status()], []);
@@ -214,8 +205,6 @@ class GeminiService
             Log::error('JSON decode failed');
             throw new \Exception('Failed to decode JSON response');
         }
-
-        Log::info('JSON DECODED', ['decoded' => $decoded]);
 
         return $decoded;
     }

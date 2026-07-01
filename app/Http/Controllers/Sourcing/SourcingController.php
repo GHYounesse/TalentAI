@@ -37,6 +37,8 @@ class SourcingController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorize('sourcing.view');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -88,6 +90,8 @@ class SourcingController extends Controller
      */
     public function launch(Request $request): JsonResponse
     {
+        $this->authorize('sourcing.create');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -174,6 +178,8 @@ class SourcingController extends Controller
      */
     public function generateQuery(Request $request): JsonResponse
     {
+        $this->authorize('sourcing.create');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -221,6 +227,8 @@ class SourcingController extends Controller
      */
     public function rescore(Request $request, CandidateScoringService $scorer): JsonResponse
     {
+        $this->authorize('sourcing.edit');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -263,6 +271,8 @@ class SourcingController extends Controller
      */
     public function generateAnalysis(Request $request, CandidateScoringService $scorer): JsonResponse
     {
+        $this->authorize('sourcing.edit');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -304,6 +314,8 @@ class SourcingController extends Controller
      */
     public function queryHistory(Request $request): JsonResponse
     {
+        $this->authorize('sourcing.view');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -334,6 +346,8 @@ class SourcingController extends Controller
      */
     public function runStatus(Request $request): JsonResponse
     {
+        $this->authorize('sourcing.view');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -384,6 +398,8 @@ class SourcingController extends Controller
      */
     public function stream(Request $request): StreamedResponse
     {
+        $this->authorize('sourcing.view');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -532,9 +548,9 @@ class SourcingController extends Controller
         } catch (\Throwable $e) {
             $logger->log('sourcing.stream.error', 'Erreur lors de l\'ouverture du flux SSE : '.$e->getMessage(), ['exception' => $e->getMessage()], [ApifyRun::class]);
 
-            return response()->stream(function () use ($e) {
+            return response()->stream(function () {
                 echo "event: error\n";
-                echo 'data: '.json_encode(['message' => $e->getMessage()])."\n\n";
+                echo 'data: '.json_encode(['message' => 'Une erreur est survenue lors de l\'ouverture du flux.'])."\n\n";
                 ob_flush();
                 flush();
             }, 500, ['Content-Type' => 'text/event-stream', 'Cache-Control' => 'no-cache']);

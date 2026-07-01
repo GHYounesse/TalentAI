@@ -319,7 +319,7 @@ export default function Index({ briefs, filters }: Props) {
                 setPhase('done');
                 axios
                     .get<{ next_start_page: number }>(route('dashboard.sourcing.run-status'), { params: { run_id: runId } })
-                    .then(({ data }) => setStartPage(data.next_start_page))
+                    .then(({ data }) => setStartPage(data.next_start_page ?? startPage))
                     .catch(() => {});
             }
             es.close();
@@ -704,8 +704,23 @@ export default function Index({ briefs, filters }: Props) {
                     {/* Candidates table */}
                     {candidates.length > 0 && (
                         <div className="border-ds-border bg-ds-surface overflow-hidden rounded-xl border">
+                            <div className="border-ds-border flex items-center justify-between border-b px-4 py-3">
+                                <p className="text-ds-text2 text-[13px]">
+                                    <span className="text-ds-text font-semibold">{candidates.length}</span> candidats analysés
+                                    {runState?.total_items ? (
+                                        <span className="text-ds-text3">
+                                            {' '}
+                                            · sur <span className="font-medium">{runState.total_items}</span> profils trouvés sur LinkedIn
+                                        </span>
+                                    ) : null}
+                                </p>
+                            </div>
                             <div className="overflow-x-auto">
-                                <CandidateTable data={candidates} onDelete={() => {}} briefId={briefId || undefined} />
+                                <CandidateTable
+                                    data={[...candidates].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))}
+                                    onDelete={() => {}}
+                                    briefId={briefId || undefined}
+                                />
                             </div>
                         </div>
                     )}

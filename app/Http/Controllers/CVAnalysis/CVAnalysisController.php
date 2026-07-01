@@ -332,7 +332,7 @@ class CVAnalysisController extends Controller
             return back()->with([
                 'analysis_errors' => [[
                     'file' => null,
-                    'message' => 'Erreur serveur : '.$e->getMessage(),
+                    'message' => 'Une erreur inattendue est survenue.',
                 ]],
                 'success_count' => 0,
                 'total' => 0,

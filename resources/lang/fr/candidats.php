@@ -166,6 +166,7 @@ return [
             'experience' => 'Expérience',
             'location' => 'Localisation',
             'source' => 'Source',
+            'source_social_media' => 'Réseaux sociaux',
             'status' => 'Statut',
             'created_at' => 'Ajouté',
             'actions' => 'Actions',
@@ -208,6 +209,12 @@ return [
                 'offer' => 'Offre',
                 'rejected' => 'Rejeté',
             ],
+        ],
+
+        'flash' => [
+            'index_error' => 'Impossible de charger les candidats.',
+            'enrich_success' => 'Informations de contact enrichies.',
+            'enrich_error' => 'Impossible d\'enrichir ce contact.',
         ],
     ],
 

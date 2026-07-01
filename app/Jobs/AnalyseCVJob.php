@@ -40,14 +40,10 @@ class AnalyseCVJob implements ShouldQueue
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
-        Log::info('JOB RECEIVED', [
-            'path' => $this->path,
-            'briefId' => $this->briefId,
-        ]);
         $logger->log(
             'cv_job.start',
             'Début analyse CV.',
-            ['path' => $this->path],
+            ['brief_id' => $this->briefId],
             []
         );
 
@@ -82,25 +78,22 @@ class AnalyseCVJob implements ShouldQueue
             'cv_'
         );
 
-        file_put_contents(
-            $tempFile,
-            Storage::disk('s3')->get($this->path)
-        );
+        $cvText = '';
+        try {
+            file_put_contents(
+                $tempFile,
+                Storage::disk('s3')->get($this->path)
+            );
 
-        Log::info('TEMP FILE CREATED', [
-            'tempFile' => $tempFile,
-        ]);
-
-        $cvText = $cvParserService->extractText(
-            $tempFile
-        );
-
-        // DELETE TEMP FILE
-        unlink($tempFile);
+            $cvText = $cvParserService->extractText(
+                $tempFile
+            );
+        } finally {
+            @unlink($tempFile);
+        }
 
         Log::info('CV TEXT EXTRACTED', [
             'length' => strlen($cvText),
-            'preview' => substr($cvText, 0, 300),
         ]);
 
         if (! $cvText) {

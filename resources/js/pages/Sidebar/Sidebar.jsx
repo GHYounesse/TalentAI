@@ -17,6 +17,7 @@ import {
     Settings,
     Settings2,
     Shield,
+    Target,
     Trophy,
     Users,
     X,
@@ -168,6 +169,13 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                             route: 'dashboard.sourcing.index',
                             dot: true,
                         },
+                        can('sourcing-campaigns.view') && {
+                            id: 'sourcing-campaigns',
+                            label: t('sidebar.sourcing.sourcing-campaigns'),
+                            icon: Target,
+                            route: 'dashboard.sourcing-campaigns.index',
+                            dot: true,
+                        },
                     ],
                 },
                 {
@@ -215,8 +223,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                             icon: BarChart3,
                             route: 'dashboard.reports',
                         },
-                        // can('historique.view') &&
-                        {
+                        can('historique.view') && {
                             id: 'historique',
                             label: t('sidebar.interviews.historique'),
                             icon: Clock,

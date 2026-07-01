@@ -46,42 +46,49 @@ export default function About() {
         },
     ];
 
+    const integrations = ['LinkedIn', 'Indeed', 'Facebook Jobs', 'Zoom', 'Google Meet', 'Teams', 'Claude AI', 'Whisper'];
+
     return (
-        <section id="about" className="bg-background relative overflow-hidden py-20 sm:py-24 lg:py-28">
+        <section id="about" className="bg-background relative overflow-hidden py-16 sm:py-20 lg:py-28">
             {/* Background glow */}
             <div className="pointer-events-none absolute inset-0">
                 <div className="bg-primary/10 absolute top-1/2 left-1/2 h-[400px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]" />
             </div>
 
-            <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
+            <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* HEADER */}
-                <div className="mb-14 max-w-2xl lg:mb-20">
-                    <div className="border-border bg-card mb-5 inline-flex items-center gap-2 rounded-full border px-4 py-1.5">
+                <div className="mb-10 max-w-2xl sm:mb-14 lg:mb-20">
+                    <div className="border-border bg-card mb-4 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 sm:mb-5">
                         <span className="text-primary text-xs font-semibold tracking-widest uppercase">Comment ça marche</span>
                     </div>
 
-                    <h2 className="text-foreground text-3xl leading-tight font-bold sm:text-4xl lg:text-5xl">
+                    <h2 className="text-foreground text-2xl leading-tight font-bold sm:text-3xl lg:text-5xl">
                         Un pipeline de recrutement{' '}
                         <span className="from-primary to-chart-3 bg-gradient-to-r bg-clip-text text-transparent">automatisé</span>
                     </h2>
 
-                    <p className="text-muted-foreground mt-5 text-base leading-relaxed sm:text-lg">
+                    <p className="text-muted-foreground mt-4 text-sm leading-relaxed sm:mt-5 sm:text-base lg:text-lg">
                         De la définition du poste à la recommandation finale, RecruteAI automatise chaque étape du recrutement.
                     </p>
                 </div>
 
-                {/* STEPS */}
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {/* STEPS — 1 col on mobile, 2 on sm, 4 on lg */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
                     {steps.map((step, i) => (
-                        <div key={i} className="border-border bg-card hover:bg-accent relative rounded-2xl border p-6 transition-all duration-300">
+                        <div
+                            key={i}
+                            className="border-border bg-card hover:bg-accent relative rounded-2xl border p-5 transition-all duration-300 sm:p-6"
+                        >
                             {/* step number */}
-                            <span className="text-muted-foreground/20 absolute top-4 right-4 text-4xl font-bold">{step.num}</span>
+                            <span className="text-muted-foreground/20 absolute top-4 right-4 text-3xl font-bold sm:text-4xl">{step.num}</span>
 
                             {/* icon */}
-                            <div className="bg-primary/10 text-primary mb-6 flex h-11 w-11 items-center justify-center rounded-xl">{step.icon}</div>
+                            <div className="bg-primary/10 text-primary mb-4 flex h-10 w-10 items-center justify-center rounded-xl sm:mb-6 sm:h-11 sm:w-11">
+                                {step.icon}
+                            </div>
 
                             {/* title */}
-                            <h3 className="text-foreground mb-2 text-lg font-semibold">{step.title}</h3>
+                            <h3 className="text-foreground mb-2 text-base font-semibold sm:text-lg">{step.title}</h3>
 
                             {/* description */}
                             <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
@@ -90,11 +97,13 @@ export default function About() {
                 </div>
 
                 {/* INTEGRATIONS */}
-                <div className="border-border bg-card mt-16 rounded-2xl border p-6 sm:p-8 lg:mt-20">
-                    <p className="text-muted-foreground mb-8 text-center text-xs font-semibold tracking-widest uppercase">Intégrations natives</p>
+                <div className="border-border bg-card mt-10 rounded-2xl border p-5 sm:mt-16 sm:p-8 lg:mt-20">
+                    <p className="text-muted-foreground mb-6 text-center text-xs font-semibold tracking-widest uppercase sm:mb-8">
+                        Intégrations natives
+                    </p>
 
-                    <div className="flex flex-wrap justify-center gap-6 sm:gap-10">
-                        {['LinkedIn', 'Indeed', 'Facebook Jobs', 'Zoom', 'Google Meet', 'Teams', 'Claude AI', 'Whisper'].map((p) => (
+                    <div className="flex flex-wrap justify-center gap-3 sm:gap-6 sm:gap-x-10">
+                        {integrations.map((p) => (
                             <span key={p} className="text-muted-foreground hover:text-foreground text-sm transition-colors">
                                 {p}
                             </span>

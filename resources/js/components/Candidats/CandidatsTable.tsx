@@ -1,3 +1,4 @@
+import { safeUrl } from '@/lib/utils';
 import { Candidat } from '@/types/candidat';
 import { Link, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -144,7 +145,7 @@ export default function CandidateTable({ data, onDelete, briefId }: Props) {
 
                                                 {candidat.linkedin_url && (
                                                     <a
-                                                        href={candidat.linkedin_url}
+                                                        href={safeUrl(candidat.linkedin_url)}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="text-ds-text3 hover:bg-ds-accent/10 hover:text-ds-accent2 flex h-5 w-5 items-center justify-center rounded-md transition"

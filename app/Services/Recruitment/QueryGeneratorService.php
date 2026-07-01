@@ -57,7 +57,25 @@ PROMPT;
             $result = $this->hardcodedFallback($briefTitle, $searchPrompt);
         }
 
+        if ($mode === 'broad') {
+            $result = $this->enforceMaxExclusions($result, 5);
+        }
+
         return $this->enforce300Limit($result);
+    }
+
+    private function enforceMaxExclusions(string $query, int $max): string
+    {
+        if (! preg_match('/^(.+? NOT \()(.+)(\))$/', $query, $m)) {
+            return $query;
+        }
+
+        $terms = array_map('trim', explode(' OR ', $m[2]));
+        if (count($terms) <= $max) {
+            return $query;
+        }
+
+        return $m[1].implode(' OR ', array_slice($terms, 0, $max)).$m[3];
     }
 
     private function looksLikePrompt(string $text): bool

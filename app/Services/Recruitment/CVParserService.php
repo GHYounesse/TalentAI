@@ -30,7 +30,6 @@ class CVParserService
 
             Log::info('PDF TEXT EXTRACTED', [
                 'length' => strlen($text),
-                'preview' => substr($text, 0, 500),
             ]);
 
             return trim($text);

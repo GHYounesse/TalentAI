@@ -34,49 +34,51 @@ export default function Features() {
     ];
 
     return (
-        <section id="features" className="bg-background relative overflow-hidden py-20 lg:py-28">
+        <section id="features" className="bg-background relative overflow-hidden py-16 sm:py-20 lg:py-28">
             {/* background */}
             <div className="pointer-events-none absolute inset-0">
                 <div className="bg-primary/10 absolute right-0 bottom-0 h-[400px] w-[500px] rounded-full blur-[120px]" />
                 <div className="bg-chart-3/10 absolute top-0 left-0 h-[400px] w-[400px] rounded-full blur-[120px]" />
             </div>
 
-            <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
+            <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* HEADER */}
-                <div className="mx-auto mb-14 max-w-2xl text-center lg:mb-20">
-                    <div className="border-border bg-card mb-6 inline-flex items-center rounded-full border px-4 py-1.5">
+                <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14 lg:mb-20">
+                    <div className="border-border bg-card mb-5 inline-flex items-center rounded-full border px-4 py-1.5 sm:mb-6">
                         <span className="text-primary text-xs font-semibold tracking-widest uppercase">Fonctionnalités</span>
                     </div>
 
-                    <h2 className="text-foreground text-3xl leading-tight font-bold sm:text-4xl lg:text-5xl">
+                    <h2 className="text-foreground text-2xl leading-tight font-bold sm:text-3xl lg:text-5xl">
                         Tout ce dont vous avez besoin{' '}
                         <span className="from-primary to-chart-3 bg-gradient-to-r bg-clip-text text-transparent">dans un seul outil</span>
                     </h2>
 
-                    <p className="text-muted-foreground mt-4 text-base lg:text-lg">Modules IA interconnectés pour automatiser tout le recrutement.</p>
+                    <p className="text-muted-foreground mt-3 text-sm sm:mt-4 sm:text-base lg:text-lg">
+                        Modules IA interconnectés pour automatiser tout le recrutement.
+                    </p>
                 </div>
 
                 {/* FEATURES GRID */}
-                <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="mb-10 grid grid-cols-1 gap-4 sm:mb-16 sm:gap-6 md:grid-cols-2">
                     {features.map((f, i) => (
                         <div
                             key={i}
-                            className="border-border bg-card hover:bg-accent relative rounded-2xl border p-6 transition-all duration-300 lg:p-8"
+                            className="border-border bg-card hover:bg-accent relative rounded-2xl border p-5 transition-all duration-300 sm:p-6 lg:p-8"
                         >
                             {/* tag */}
                             <span className="text-primary text-xs font-semibold tracking-widest uppercase">{f.tag}</span>
 
                             {/* title */}
-                            <h3 className="text-foreground mt-3 text-xl font-bold">{f.title}</h3>
+                            <h3 className="text-foreground mt-2.5 text-lg font-bold sm:mt-3 sm:text-xl">{f.title}</h3>
 
                             {/* desc */}
-                            <p className="text-muted-foreground mt-3 text-sm leading-relaxed">{f.desc}</p>
+                            <p className="text-muted-foreground mt-2.5 text-sm leading-relaxed sm:mt-3">{f.desc}</p>
 
                             {/* bullets */}
-                            <ul className="mt-6 space-y-2">
+                            <ul className="mt-4 space-y-2 sm:mt-6">
                                 {f.bullets.map((b, j) => (
                                     <li key={j} className="text-muted-foreground flex items-start gap-2 text-sm">
-                                        <span className="bg-primary mt-1 h-1.5 w-1.5 rounded-full" />
+                                        <span className="bg-primary mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
                                         {b}
                                     </li>
                                 ))}
@@ -86,25 +88,30 @@ export default function Features() {
                 </div>
 
                 {/* VERDICTS */}
-                <div className="border-border bg-card rounded-2xl border p-6 lg:p-10">
-                    <div className="grid items-center gap-8 lg:grid-cols-2">
+                <div className="border-border bg-card rounded-2xl border p-5 sm:p-6 lg:p-10">
+                    <div className="grid items-center gap-6 sm:gap-8 lg:grid-cols-2">
                         {/* LEFT */}
                         <div>
                             <span className="text-primary text-xs font-semibold tracking-widest uppercase">Système IA</span>
 
-                            <h3 className="text-foreground mt-4 text-2xl font-bold lg:text-3xl">Verdict intelligent des candidats</h3>
+                            <h3 className="text-foreground mt-3 text-xl font-bold sm:mt-4 sm:text-2xl lg:text-3xl">
+                                Verdict intelligent des candidats
+                            </h3>
 
-                            <p className="text-muted-foreground mt-4 leading-relaxed">
+                            <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:mt-4 sm:text-base">
                                 Chaque candidat reçoit une évaluation basée sur des données objectives issues du CV et des entretiens.
                             </p>
                         </div>
 
                         {/* RIGHT */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
                             {verdicts.map((v, i) => (
-                                <div key={i} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${v.color} `}>
-                                    <span className="h-2 w-2 rounded-full bg-current" />
-                                    <span className="text-sm font-medium">{v.label}</span>
+                                <div
+                                    key={i}
+                                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3 ${v.color}`}
+                                >
+                                    <span className="h-2 w-2 shrink-0 rounded-full bg-current" />
+                                    <span className="text-xs font-medium sm:text-sm">{v.label}</span>
                                 </div>
                             ))}
                         </div>

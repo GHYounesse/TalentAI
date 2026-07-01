@@ -10,6 +10,7 @@ return [
         'title' => 'Sourcing',
         'brief' => 'Liste des briefs',
         'auto' => 'Sourcing auto',
+        'sourcing-campaigns' => 'Sourcing campaigns',
     ],
 
     'candidats' => [

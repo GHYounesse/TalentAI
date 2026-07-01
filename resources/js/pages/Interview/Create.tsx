@@ -171,6 +171,7 @@ export default function CreateInterview({ candidates, briefs, interviews }: Crea
             pollRef.current = setInterval(async () => {
                 try {
                     const res = await fetch(`/dashboard/interviews/${id}/status`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
 
                     setAnalysisStatus(data.analysis_status ?? 'pending');

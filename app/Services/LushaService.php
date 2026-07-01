@@ -45,14 +45,7 @@ class LushaService
 
     public function enrichContact(string $lushaId): ?array
     {
-        Log::info('=== LUSHA ENRICH STEP START ===', [
-            'lusha_id' => $lushaId,
-        ]);
-
         try {
-
-            Log::info('Sending enrich request to Lusha API');
-
             $response = Http::withHeaders([
                 'api_key' => $this->apiKey,
             ])->post("{$this->baseUrl}/contacts/enrich", [
@@ -60,18 +53,10 @@ class LushaService
                 'reveal' => ['emails', 'phones'],
             ]);
 
-            Log::info('Lusha response received', [
-                'status' => $response->status(),
-            ]);
-
-            Log::info('Lusha raw body', [
-                'body' => $response->body(),
-            ]);
-
             if ($response->failed()) {
-                Log::error('Lusha request failed', [
+                Log::error('Lusha enrich request failed', [
+                    'lusha_id' => $lushaId,
                     'status' => $response->status(),
-                    'body' => $response->body(),
                 ]);
 
                 return null;
@@ -79,36 +64,24 @@ class LushaService
 
             $results = $response->json('results');
 
-            Log::info('Parsed Lusha results', [
-                'results' => $results,
-            ]);
-
             if (empty($results)) {
-                Log::warning('Empty results from Lusha enrich');
+                Log::warning('Lusha enrich: empty results', ['lusha_id' => $lushaId]);
 
                 return null;
             }
 
             if (isset($results[0]['error'])) {
-                Log::warning('Lusha enrich returned error', [
-                    'error' => $results[0]['error'],
-                ]);
+                Log::warning('Lusha enrich returned error', ['error' => $results[0]['error']]);
 
                 return null;
             }
 
-            Log::info('=== LUSHA ENRICH SUCCESS ===', [
-                'contact' => $results[0],
-            ]);
-
             return $results[0];
 
         } catch (\Throwable $e) {
-
-            Log::error('LUSHA EXCEPTION', [
+            Log::error('Lusha enrich exception', [
+                'lusha_id' => $lushaId,
                 'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
             ]);
 
             return null;

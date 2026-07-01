@@ -25,6 +25,8 @@ class HistoriqueController extends Controller
         $logger = app(ActivityLogger::class);
 
         try {
+            $this->authorize('historique.view');
+
             $query = Interview::query()
                 ->with([
                     'candidate:id,full_name,headline,current_title,current_company,linkedin_url,raw_data',
@@ -60,7 +62,7 @@ class HistoriqueController extends Controller
                 $query->whereDate('scheduled_at', '<=', $request->input('date_to'));
             }
 
-            $interviews = $query->paginate(15)->through(fn ($interview) => [
+            $interviews = $query->paginate(100)->through(fn ($interview) => [
                 'id' => $interview->id,
                 'platform' => $interview->platform,
                 'status' => $interview->status,

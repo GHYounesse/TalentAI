@@ -37,7 +37,7 @@ class ActivityLogController extends Controller
                 $search, $action, $user, $dateFrom, $dateTo
             )
                 ->orderByDesc('logged_at')
-                ->paginate(25)
+                ->paginate(100)
                 ->withQueryString()
                 ->through(fn ($log) => [
                     'id' => $log->id,

@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 Route::get('/classement', function (Request $request) {
+    abort_if(! $request->user()?->can('candidates.view'), 403);
 
     $briefs = Brief::select('id', 'title')
         ->orderByDesc('created_at')

@@ -41,10 +41,10 @@ jobs:
                   key: ${{ secrets.PRIVATE_KEY }}
                   script: |
                       cd /home/recruteai/recruteai
-                      git pull origin dev
+                      git pull origin main
                       composer install --no-dev --optimize-autoloader
-                      php artisan migrate --force
                       php artisan config:cache
                       php artisan route:cache
                       php artisan view:cache
+                      php artisan optimize
                       sudo /usr/local/bin/supervisorctl restart laravel-worker

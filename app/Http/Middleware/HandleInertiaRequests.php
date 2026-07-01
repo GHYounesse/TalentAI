@@ -44,7 +44,11 @@ class HandleInertiaRequests extends Middleware
             'id' => fn () => $request->session()->get('id'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => fn () => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                ] : null,
                 'roles' => fn () => $request->user()?->roleNames() ?? [],
                 'permissions' => fn () => $request->user()?->permissionNames() ?? [],
             ],
@@ -70,6 +74,7 @@ class HandleInertiaRequests extends Middleware
                 'interviews' => __('interviews'),
                 'parameters' => __('parameters'),
                 'historique' => __('historique'),
+                'sourcing_campaigns' => __('sourcing_campaigns'),
             ],
         ];
     }

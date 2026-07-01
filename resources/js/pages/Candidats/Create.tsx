@@ -8,7 +8,7 @@ interface StatusOption {
 }
 
 interface Props {
-    statuses: StatusOption[];
+    params: { status_candidat?: StatusOption[] };
 }
 
 const inputCls = (err?: string) =>
@@ -29,7 +29,17 @@ function Field({ label, required, error, children }: { label: string; required?:
     );
 }
 
-export default function CreateCandidat({ statuses }: Props) {
+const DEFAULT_STATUSES: StatusOption[] = [
+    { value: 'sourced', label: 'Sourcé' },
+    { value: 'contacted', label: 'Contacté' },
+    { value: 'interview', label: 'Entretien' },
+    { value: 'recommended', label: 'Recommandé' },
+    { value: 'offer', label: 'Offre' },
+    { value: 'rejected', label: 'Rejeté' },
+];
+
+export default function CreateCandidat({ params }: Props) {
+    const statuses = params.status_candidat && params.status_candidat.length > 0 ? params.status_candidat : DEFAULT_STATUSES;
     const { data, setData, post, processing, errors } = useForm({
         full_name: '',
         email: '',
@@ -41,7 +51,7 @@ export default function CreateCandidat({ statuses }: Props) {
         education_level: '',
         source: '',
         source_url: '',
-        status: 'sourced',
+        status: statuses[0]?.value ?? '',
         linkedin_url: '',
         headline: '',
         summary: '',

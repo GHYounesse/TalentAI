@@ -26,7 +26,8 @@ Route::delete('/briefs/{brief}', [BriefController::class, 'destroy'])
 Route::post('/briefs/{brief}/activate', [BriefController::class, 'activate'])->name('briefs.activate')->middleware('can:briefs.approve');
 
 Route::post('/briefs/{brief}/status', [BriefController::class, 'updateStatus'])
-    ->name('briefs.updateStatus');
+    ->name('briefs.updateStatus')
+    ->middleware('can:briefs.edit');
 
 Route::post('briefs/import', [BriefImportController::class, 'extractFromFile'])
     ->name('briefs.import');

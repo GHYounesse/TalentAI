@@ -27,6 +27,8 @@ class BriefImportController extends Controller
         $logger = app(ActivityLogger::class);
 
         try {
+            $this->authorize('briefs.create');
+
             $request->validate([
                 'file' => 'required|file|mimes:pdf,doc,docx|max:5120',
             ]);
@@ -86,9 +88,7 @@ class BriefImportController extends Controller
 
     private function extractText($file): string
     {
-        $ext = strtolower($file->getClientOriginalExtension());
-
-        if ($ext === 'pdf') {
+        if ($file->getMimeType() === 'application/pdf') {
             $parser = new PdfParser;
 
             return $parser->parseFile($file->getRealPath())->getText();

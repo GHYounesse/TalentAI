@@ -30,24 +30,13 @@ class Interview extends Model
         'decision_at',
     ];
 
-    protected $casts = [
-        'scheduled_at' => 'datetime',
-        'completed_at' => 'datetime',
-        'duration_seconds' => 'integer',
-        'decision_at' => 'datetime',
-    ];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'scheduled_at' => 'datetime',
             'completed_at' => 'datetime',
             'duration_seconds' => 'integer',
+            'decision_at' => 'datetime',
         ];
     }
 

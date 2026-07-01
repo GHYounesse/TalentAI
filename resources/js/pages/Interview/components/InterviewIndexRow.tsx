@@ -2,9 +2,10 @@ import { STATUSES, StatusKey } from '@/constants/interviews';
 import { useI18n } from '@/hooks/useI18n';
 import { InterviewRecord } from '@/types/interviews';
 import { Link } from '@inertiajs/react';
-import { BarChart2, ExternalLink, Pause, Play, X } from 'lucide-react';
+import { BarChart2, ExternalLink, Pause, Play, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import TranscriptSearchModal from './TranscriptSearchModal';
 
 /* ── Platform badge ──────────────────────────────────────────────────── */
 const PLATFORM_STYLE: Record<string, string> = {
@@ -205,6 +206,7 @@ function AudioModal({ url, candidateName, onClose }: { url: string; candidateNam
 export default function InterviewIndexRow({ interview }: { interview: InterviewRecord }) {
     const { t, locale } = useI18n();
     const [showAudio, setShowAudio] = useState(false);
+    const [showTranscriptSearch, setShowTranscriptSearch] = useState(false);
 
     const statusKey = (STATUSES.includes(interview.transcription_status as StatusKey) ? interview.transcription_status : 'none') as StatusKey;
 
@@ -317,6 +319,12 @@ export default function InterviewIndexRow({ interview }: { interview: InterviewR
                                 {hasReport ? <BarChart2 size={13} /> : <ExternalLink size={12} />}
                             </Link>
                         )}
+                        <button
+                            onClick={() => setShowTranscriptSearch(true)}
+                            className="border-ds-border text-ds-text3 hover:bg-ds-surface2 hover:text-ds-accent flex h-7 w-7 items-center justify-center rounded-lg border transition"
+                        >
+                            <Search size={13} />
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -324,6 +332,7 @@ export default function InterviewIndexRow({ interview }: { interview: InterviewR
             {showAudio && interview.audio_url && (
                 <AudioModal url={interview.audio_url} candidateName={interview.candidate_name} onClose={() => setShowAudio(false)} />
             )}
+            <TranscriptSearchModal interviewId={interview.id} open={showTranscriptSearch} onClose={() => setShowTranscriptSearch(false)} />
         </>
     );
 }

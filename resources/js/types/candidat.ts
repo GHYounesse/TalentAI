@@ -1,5 +1,5 @@
 import type { Brief } from './brief';
-export type CandidatStatus = 'sourced' | 'contacted' | 'interview' | 'recommended' | 'offer' | 'rejected';
+export type CandidatStatus = string;
 
 export interface Candidat {
     id: number;
@@ -13,6 +13,11 @@ export interface Candidat {
     education_level: string | null;
     source: string | null;
     source_url: string | null;
+    source_context: {
+        post_author?: string | null;
+        post_url?: string | null;
+        type?: string;
+    } | null;
     status: CandidatStatus;
     linkedin_url: string | null;
     headline: string | null;
@@ -53,6 +58,7 @@ export interface IndexCandidatProps {
     candidats: PaginatedCandidats;
     filters: IndexCandidatFilters;
     briefs: { id: number; title: string }[];
+    params: { status_candidat?: { value: string; label: string }[] };
 }
 
 export interface Interviewer {

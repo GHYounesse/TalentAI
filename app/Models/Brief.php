@@ -45,6 +45,8 @@ class Brief extends Model
         'status',
     ];
 
+    protected $hidden = ['search_prompt', 'current_query', 'scoring_weights'];
+
     /**
      * Get the attributes that should be cast.
      *

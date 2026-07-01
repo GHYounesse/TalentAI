@@ -3,6 +3,7 @@ import FilterPanel, { FilterEntry } from '@/components/ui/FilterPanel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/hooks/useI18n';
 import AppLayout from '@/layouts/app-layout';
+import { safeUrl } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import { Award, Download, LayoutGrid, LayoutList, Phone, X } from 'lucide-react';
 import { useState } from 'react';
@@ -144,9 +145,9 @@ function DetailPanel({ selected, selectedIndex, onClose }: DetailPanelProps) {
                     <div className="mt-2.5 flex justify-center gap-2">
                         {selected.linkedin_url && (
                             <a
-                                href={selected.linkedin_url}
+                                href={safeUrl(selected.linkedin_url)}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                                 className="rounded-full border border-[#5b9bd5]/40 bg-[#5b9bd5]/15 px-3 py-1 text-xs font-medium text-[#5b9bd5]"
                             >
                                 LinkedIn

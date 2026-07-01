@@ -10,6 +10,7 @@ use App\Services\ParameterService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -116,7 +117,7 @@ class BriefController extends Controller
             $this->applyFilters($query, $filters);
             $briefs = $query
                 ->latest()
-                ->paginate(10)
+                ->paginate(100)
                 ->through(fn ($brief) => [
                     'id' => $brief->id,
                     'title' => $brief->title,
@@ -247,10 +248,11 @@ class BriefController extends Controller
                 $logger->log(
                     'brief.store',
                     "Création du brief « {$brief->title} » (ID : {$brief->id}).",
-                    [$request->all()],
+                    ['brief_id' => $brief->id, 'title' => $brief->title],
                     [Brief::class]
                 );
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                Log::warning('Activity log failed in brief.store', ['error' => $e->getMessage()]);
             }
 
             return redirect()->route('dashboard.briefs.index')
@@ -412,7 +414,8 @@ class BriefController extends Controller
                     ['brief_id' => $brief->id, 'modifications' => $modifications],
                     [Brief::class]
                 );
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                Log::warning('Activity log failed in brief.update', ['error' => $e->getMessage()]);
             }
 
             return redirect()->route('dashboard.briefs.index')
@@ -472,6 +475,8 @@ class BriefController extends Controller
      */
     public function activate(Brief $brief): RedirectResponse|Response
     {
+        $this->authorize('briefs.approve');
+
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -563,8 +568,8 @@ class BriefController extends Controller
                     ],
                     [Brief::class]
                 );
-            } catch (\Throwable) {
-                // logging non bloquant
+            } catch (\Throwable $e) {
+                Log::warning('Activity log failed in brief.updateStatus', ['error' => $e->getMessage()]);
             }
 
             return back()->with('success', 'Statut du brief mis à jour.');

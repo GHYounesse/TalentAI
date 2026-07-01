@@ -145,7 +145,7 @@ class InterviewController extends Controller
 
             $interviews = $query
                 ->latest('scheduled_at')
-                ->paginate(10)
+                ->paginate(100)
                 ->through(fn ($i) => [
                     'id' => $i->id,
                     'candidate_name' => $i->candidate?->full_name ?? '—',
@@ -306,6 +306,7 @@ class InterviewController extends Controller
     public function show(Interview $interview): Response
     {
         $this->authorize('interviews.view');
+        abort_if($interview->interviewer_id !== auth()->id(), 403);
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
 
@@ -420,6 +421,7 @@ class InterviewController extends Controller
     public function status(Interview $interview, AssemblyAIService $assemblyAI): JsonResponse
     {
         $this->authorize('interviews.view');
+        abort_if($interview->interviewer_id !== auth()->id(), 403);
 
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
@@ -427,41 +429,52 @@ class InterviewController extends Controller
         try {
             $interview->load('brief');
 
-            $transcription = DB::transaction(function () use ($interview, $assemblyAI) {
-                $transcription = Transcription::where('interview_id', $interview->id)
-                    ->lockForUpdate()
-                    ->first();
+            // Read the transcription outside any lock first.
+            $transcription = Transcription::where('interview_id', $interview->id)->first();
 
-                if (! $transcription) {
-                    return null;
+            if ($transcription && $transcription->status === 'pending' && $transcription->assemblyai_transcript_id) {
+                // Do the slow HTTP call before acquiring the DB lock.
+                $assemblyStatus = $assemblyAI->checkStatus($transcription->assemblyai_transcript_id);
+
+                $utterances = null;
+                $turns = null;
+                if ($assemblyStatus === 'completed') {
+                    Log::info('Interview status check: AssemblyAI completed, processing utterances', [
+                        'transcription_id' => $transcription->id,
+                        'interview_id' => $interview->id,
+                        'assemblyai_transcript_id' => $transcription->assemblyai_transcript_id,
+                        'pending_since' => $transcription->created_at?->diffForHumans(),
+                    ]);
+                    $utterances = $assemblyAI->fetchUtterances($transcription->assemblyai_transcript_id);
+
+                    $firstSpeaker = $utterances[0]['speaker'] ?? 'A';
+                    $speakerMap = [$firstSpeaker => 'Interviewer'];
+                    foreach ($utterances as $u) {
+                        if (! isset($speakerMap[$u['speaker']])) {
+                            $speakerMap[$u['speaker']] = 'Candidate';
+                        }
+                    }
+
+                    $turns = array_values(array_filter(
+                        array_map(fn ($u) => trim($u['text']) === '' ? null : [
+                            'speaker' => $speakerMap[$u['speaker']] ?? $u['speaker'],
+                            'text' => $u['text'],
+                        ], $utterances)
+                    ));
                 }
 
-                if ($transcription->status === 'pending' && $transcription->assemblyai_transcript_id) {
-                    $assemblyStatus = $assemblyAI->checkStatus($transcription->assemblyai_transcript_id);
+                // Now lock the row only for the DB write.
+                $transcription = DB::transaction(function () use ($interview, $assemblyStatus, $turns) {
+                    $transcription = Transcription::where('interview_id', $interview->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    if ($assemblyStatus === 'completed') {
-                        Log::info('Interview status check: AssemblyAI completed, processing utterances', [
-                            'transcription_id' => $transcription->id,
-                            'interview_id' => $interview->id,
-                            'assemblyai_transcript_id' => $transcription->assemblyai_transcript_id,
-                            'pending_since' => $transcription->created_at?->diffForHumans(),
-                        ]);
-                        $utterances = $assemblyAI->fetchUtterances($transcription->assemblyai_transcript_id);
+                    if (! $transcription || $transcription->status !== 'pending') {
+                        return $transcription;
+                    }
 
-                        $firstSpeaker = $utterances[0]['speaker'] ?? 'A';
-                        $speakerMap = [$firstSpeaker => 'Interviewer'];
-                        foreach ($utterances as $u) {
-                            if (! isset($speakerMap[$u['speaker']])) {
-                                $speakerMap[$u['speaker']] = 'Candidate';
-                            }
-                        }
-
-                        $turns = array_values(array_filter(
-                            array_map(fn ($u) => trim($u['text']) === '' ? null : [
-                                'speaker' => $speakerMap[$u['speaker']] ?? $u['speaker'],
-                                'text' => $u['text'],
-                            ], $utterances)
-                        ));
+                    if ($assemblyStatus === 'completed' && $turns !== null) {
+                        $brief = $this->formatBrief($interview->brief, $interview->expectations ?? '');
 
                         $transcription->update([
                             'status' => 'done',
@@ -469,8 +482,6 @@ class InterviewController extends Controller
                             'diarized_transcript' => json_encode($turns),
                             'analysis_status' => 'processing',
                         ]);
-
-                        $brief = $this->formatBrief($interview->brief, $interview->expectations ?? '');
 
                         AnalyseTranscriptionJob::dispatch($transcription, $brief, []);
                         Log::info('Interview status check: analysis job dispatched', [
@@ -488,10 +499,10 @@ class InterviewController extends Controller
                         ]);
                         $transcription->update(['status' => 'failed']);
                     }
-                }
 
-                return $transcription;
-            });
+                    return $transcription;
+                });
+            }
 
             if (! $transcription) {
                 return response()->json(['status' => 'pending', 'analysis_status' => 'pending']);
@@ -510,7 +521,7 @@ class InterviewController extends Controller
             return response()->json([
                 'status' => 'failed',
                 'analysis_status' => 'failed',
-                'error' => $e->getMessage(),
+                'error' => 'Une erreur est survenue.',
             ], 500);
         }
     }
@@ -522,6 +533,7 @@ class InterviewController extends Controller
     public function audio(Interview $interview): StreamedResponse|\Illuminate\Http\Response
     {
         $this->authorize('interviews.view');
+        abort_if($interview->interviewer_id !== auth()->id(), 403);
 
         /** @var ActivityLogger $logger */
         $logger = app(ActivityLogger::class);
@@ -606,8 +618,6 @@ class InterviewController extends Controller
         $experience = $brief->min_experience_years ?? 'Non précisé';
         $education = $brief->education_level ?? 'Non précisé';
         $seniority = $brief->seniority_level ?? 'Non précisé';
-        $gender = $brief->gender_pref;
-        $age = $brief->age_range;
         $mission = $brief->mission_description;
         $title = $brief->title;
 
@@ -621,8 +631,6 @@ class InterviewController extends Controller
             Niveau d'études : {$education}
             Langues : {$langs}
             Séniorité : {$seniority}
-            Préférence genre : {$gender}
-            Tranche d'âge : {$age}
 
             Mission :
             {$mission}
@@ -632,5 +640,45 @@ class InterviewController extends Controller
 
             Pondération des critères d'évaluation : {$weights}{$expectationsSection}
             BRIEF;
+    }
+
+    /**
+     * Retrieve the transcript associated with an interview.
+     */
+    public function search(Interview $interview): JsonResponse
+    {
+        $this->authorize('interviews.view');
+        abort_if($interview->interviewer_id !== auth()->id(), 403);
+
+        /** @var ActivityLogger $logger */
+        $logger = app(ActivityLogger::class);
+
+        try {
+            $transcription = Transcription::where(
+                'interview_id',
+                $interview->id
+            )->first();
+
+            return response()->json([
+                'transcript' => json_decode(
+                    $transcription?->diarized_transcript ?? '[]',
+                    true
+                ),
+            ]);
+        } catch (\Throwable $e) {
+            $logger->log(
+                'interview.transcript.search.error',
+                "Erreur lors du chargement de la transcription (ID : {$interview->id}) : ".$e->getMessage(),
+                [
+                    'interview_id' => $interview->id,
+                    'exception' => $e->getMessage(),
+                ],
+                [Interview::class]
+            );
+
+            return response()->json([
+                'message' => 'Impossible de charger la transcription.',
+            ], 500);
+        }
     }
 }
