@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { ChevronLeft, ChevronRight, Edit2, Eye, Plus, RefreshCw, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import ReactSelect from 'react-select';
 
@@ -69,13 +69,16 @@ interface PaginationMeta {
     total: number;
 }
 
-function Pagination({ meta, search }: { meta: PaginationMeta; search: string }) {
+function Pagination({ meta, filters }: { meta: PaginationMeta; filters: FilterEntry[] }) {
     const { current_page, last_page, from, to, total } = meta;
-
     if (last_page <= 1) return null;
 
     function goTo(page: number) {
-        router.get(route('dashboard.briefs.index'), { page, ...(search ? { search } : {}) }, { preserveState: true, preserveScroll: false });
+        const cleanFilters = filters
+            .filter((f) => (Array.isArray(f.value) ? f.value.length > 0 : f.value && (f.value as string).trim() !== ''))
+            .map((f) => ({ field: f.field, value: Array.isArray(f.value) ? f.value.join(',') : f.value }));
+
+        router.get(route('dashboard.briefs.index'), { page, filters: JSON.stringify(cleanFilters) }, { preserveState: true, preserveScroll: false });
     }
 
     const pages = Array.from({ length: last_page }, (_, i) => i + 1);
@@ -128,7 +131,7 @@ function Pagination({ meta, search }: { meta: PaginationMeta; search: string }) 
 
 export default function Index({ briefs, filters, params, brief_statuses }: IndexBriefProps) {
     const { t } = useI18n();
-    const [search] = useState('');
+
     const { can, isSuperAdmin } = usePermission();
     const canCreateBriefs = isSuperAdmin() || can('briefs.create');
 
@@ -140,56 +143,56 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
     const [loading, setLoading] = useState(false);
     const [activeFilters, setActiveFilters] = useState<FilterEntry[]>(Array.isArray(filters) ? filters : []);
 
-    const FILTER_FIELDS = [
-        { key: 'title', label: t('briefs.index.filters.fields.title'), type: 'text' as const },
-        { key: 'product_reference', label: 'Product Reference', type: 'text' as const },
-        { key: 'mission_code', label: 'Mission Code', type: 'text' as const },
-        {
-            key: 'sector',
-            label: t('briefs.index.filters.fields.sector'),
-            type: 'select' as const,
-            multi: true,
-            options: params.sectors,
-        },
-        {
-            key: 'contract_type',
-            label: t('briefs.index.filters.fields.contract_type'),
-            type: 'select' as const,
-            multi: true,
-            options: params.contract_types,
-        },
-        { key: 'location', label: t('briefs.index.filters.fields.location'), type: 'text' as const },
-        { key: 'min_experience_years', label: t('briefs.index.filters.fields.min_experience_years'), type: 'number' as const },
-        {
-            key: 'education_level',
-            label: t('briefs.index.filters.fields.education_level'),
-            type: 'select' as const,
-            multi: true,
-            options: params.education_levels,
-        },
-        {
-            key: 'status',
-            label: t('briefs.index.filters.fields.status'),
-            type: 'select' as const,
-            multi: true,
-            options: brief_statuses,
-        },
-    ];
+    const FILTER_FIELDS = useMemo(
+        () => [
+            { key: 'title', label: t('briefs.index.filters.fields.title'), type: 'text' as const },
+            { key: 'product_reference', label: 'Product Reference', type: 'text' as const },
+            { key: 'mission_code', label: 'Mission Code', type: 'text' as const },
+            {
+                key: 'sector',
+                label: t('briefs.index.filters.fields.sector'),
+                type: 'select' as const,
+                multi: true,
+                options: params.sectors,
+            },
+            {
+                key: 'contract_type',
+                label: t('briefs.index.filters.fields.contract_type'),
+                type: 'select' as const,
+                multi: true,
+                options: params.contract_types,
+            },
+            { key: 'location', label: t('briefs.index.filters.fields.location'), type: 'text' as const },
+            { key: 'min_experience_years', label: t('briefs.index.filters.fields.min_experience_years'), type: 'number' as const },
+            {
+                key: 'education_level',
+                label: t('briefs.index.filters.fields.education_level'),
+                type: 'select' as const,
+                multi: true,
+                options: params.education_levels,
+            },
+            {
+                key: 'status',
+                label: t('briefs.index.filters.fields.status'),
+                type: 'select' as const,
+                multi: true,
+                options: brief_statuses,
+            },
+        ],
+        [t, params, brief_statuses],
+    );
 
     function handleUpdateStatus() {
         if (!statusBrief) return;
-
         setUpdatingStatus(true);
-
         router.post(
             route('dashboard.briefs.updateStatus', statusBrief.id),
-            {
-                status: newStatus,
-            },
+            { status: newStatus },
             {
                 onSuccess: () => {
                     setStatusBrief(null);
                 },
+                onError: () => toast.error(t('briefs.index.flash.status_error')),
                 onFinish: () => setUpdatingStatus(false),
             },
         );
@@ -199,6 +202,7 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
         if (!deletingBrief) return;
         router.delete(route('dashboard.briefs.destroy', deletingBrief.id), {
             onSuccess: () => setDeletingBrief(null),
+            onError: () => toast.error(t('briefs.index.flash.delete_error')),
         });
     }
 
@@ -210,7 +214,7 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
 
         router.get(
             route('dashboard.briefs.index'),
-            { filters: JSON.stringify(cleanFilters) },
+            { page: 1, filters: JSON.stringify(cleanFilters) },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -368,7 +372,7 @@ export default function Index({ briefs, filters, params, brief_statuses }: Index
 
                             {/* ── Pagination ── */}
                             <div className="px-4 pb-4">
-                                <Pagination meta={briefs} search={search} />
+                                <Pagination meta={briefs} filters={activeFilters} />
                             </div>
                         </div>
                     )}

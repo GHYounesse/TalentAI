@@ -61,7 +61,13 @@ class BriefController extends Controller
                 continue;
             }
 
-            $query->where($field, 'like', '%'.$filter['value'].'%');
+            $values = array_filter(array_map('trim', explode(',', (string) $filter['value'])));
+
+            if (count($values) > 1) {
+                $query->whereIn($field, $values);
+            } else {
+                $query->where($field, 'like', '%'.$values[0].'%');
+            }
         }
     }
 
@@ -464,9 +470,7 @@ class BriefController extends Controller
                 [Brief::class]
             );
 
-            return Inertia::render('Fallback', [
-                'error' => 'Impossible de supprimer ce brief.',
-            ]);
+            return back()->withErrors(['delete' => 'Impossible de supprimer ce brief.']);
         }
     }
 
@@ -522,7 +526,7 @@ class BriefController extends Controller
 
         try {
             $validated = $request->validate([
-                'status' => 'required|in:lancement,cloture',
+                'status' => ['required', Rule::enum(BriefStatus::class)],
             ]);
 
             $statutAvant = $brief->status;
@@ -569,7 +573,9 @@ class BriefController extends Controller
                     [Brief::class]
                 );
             } catch (\Throwable $e) {
-                Log::warning('Activity log failed in brief.updateStatus', ['error' => $e->getMessage()]);
+                Log::error('Erreur lors de la mise à jour du statut', ['brief_id' => $brief->id, 'exception' => $e->getMessage()]);
+
+                return back()->withErrors(['status' => 'Impossible de mettre à jour le statut du brief.']);
             }
 
             return back()->with('success', 'Statut du brief mis à jour.');

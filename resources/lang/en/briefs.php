@@ -286,6 +286,11 @@ return [
                 'label' => 'New status',
             ],
         ],
+        'flash' => [
+            'status_error' => 'Error updating brief status',
+            'index_error' => 'Error searching for briefs',
+            'delete_error' => 'Error deleting brief',
+        ],
     ],
     'import_modal' => [
         'title' => 'New mission brief',

@@ -287,6 +287,11 @@ return [
                 'label' => 'Nouveau statut',
             ],
         ],
+        'flash' => [
+            'status_error' => 'Erreur lors de la mise à jour du statut',
+            'index_error' => 'Erreur lors de la recherche des briefs',
+            'delete_error' => 'Erreur lors de la suppression du brief',
+        ],
     ],
     'import_modal' => [
         'title' => 'Nouveau brief de mission',
