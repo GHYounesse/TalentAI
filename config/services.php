@@ -75,5 +75,8 @@ return [
     'lusha' => [
         'api_key' => env('LUSHA_API_KEY'),
     ],
+    'signalhire' => [
+        'api_key' => env('SIGNALHIRE_API_KEY'),
+    ],
 
 ];

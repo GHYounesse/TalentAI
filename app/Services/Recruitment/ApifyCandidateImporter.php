@@ -4,14 +4,17 @@ namespace App\Services\Recruitment;
 
 use App\Models\ApifyRun;
 use App\Models\Candidat;
+use App\Services\LushaService;
+use App\Services\SignalHireService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
  * Fetches scraped LinkedIn profiles from an Apify dataset, upserts them as
- * Candidat records, scores them against the brief, and attaches them to the
- * brief via the pivot table.
+ * Candidat records, enriches them with contact data (email/phone) via Lusha
+ * (with SignalHire as a fallback for anything Lusha can't resolve), scores
+ * them against the brief, and attaches them to the brief via the pivot table.
  *
  * Two entry points:
  *   importPage()  — incremental, cursor-based (used by ApifySourceJob).
@@ -21,12 +24,31 @@ use Illuminate\Support\Facades\Http;
  *
  *   import()      — legacy bulk import used by FetchApifyResultsJob (background sourcing).
  *                   Fetches the full dataset in one call, no cursor.
+ *
+ * Contact enrichment: after each batch of candidates is upserted (and before
+ * scoring), enrichBatchAndPersist() calls Lusha once for the whole batch
+ * (search + enrich, each chunked at Lusha's 100-per-request limit) instead of
+ * once per candidate. Candidates that already have an email or phone from a
+ * prior run are skipped to avoid paying for the same lookup twice.
+ *
+ * Any candidate Lusha couldn't resolve (no email AND no phone returned) is
+ * retried once against SignalHireService (synchronous "withoutWaterfall"
+ * mode) as a fallback source. Lusha is always tried first since it's the
+ * primary/preferred provider; SignalHire only picks up the leftovers.
+ *
+ * Enrichment failures — from either provider — never block import: a
+ * candidate is always upserted/scored/attached even if enrichment fails or
+ * both providers find nothing.
  */
 class ApifyCandidateImporter
 {
     private const MIN_SCORE = 0.0;
 
-    public function __construct(private CandidateScoringService $scorer) {}
+    public function __construct(
+        private CandidateScoringService $scorer,
+        private LushaService $lusha,
+        private SignalHireService $signalHire,
+    ) {}
 
     // -------------------------------------------------------------------------
     // Public: incremental page import (used by ApifySourceJob)
@@ -81,6 +103,8 @@ class ApifyCandidateImporter
         }
 
         if ($candidates->isNotEmpty()) {
+            $this->enrichBatchAndPersist($candidates);
+
             $scores = $this->scorer->scoreBatch($brief, $candidates);
             $this->attachScored($brief, $candidates, $scores);
 
@@ -126,6 +150,8 @@ class ApifyCandidateImporter
             return 0;
         }
 
+        $this->enrichBatchAndPersist($candidates);
+
         $scores = $this->scorer->scoreBatch($brief, $candidates);
 
         return $this->attachScored($brief, $candidates, $scores);
@@ -162,6 +188,8 @@ class ApifyCandidateImporter
         if ($candidates->isEmpty()) {
             return 0;
         }
+
+        $this->enrichBatchAndPersist($candidates);
 
         $scores = $this->scorer->scoreBatch($brief, $candidates);
         $count = 0;
@@ -213,6 +241,94 @@ class ApifyCandidateImporter
     // -------------------------------------------------------------------------
 
     /**
+     * Batch-enrich a set of freshly upserted candidates with contact data
+     * (email/phone), skipping any that already have either field from a
+     * prior run, and persist the results directly on the Candidat rows.
+     *
+     * Lusha is tried first for the whole batch (one search + one enrich HTTP
+     * call, each chunked at Lusha's 100-per-request limit internally).
+     * Any candidate Lusha couldn't resolve — i.e. it returned nothing, or
+     * returned neither an email nor a phone — is retried against
+     * SignalHireService as a fallback, again as a single batched call.
+     *
+     * Never throws — enrichment failures are logged inside the respective
+     * services and simply result in no data for the affected candidates.
+     */
+    private function enrichBatchAndPersist(Collection $candidates): void
+    {
+        $toEnrich = $candidates->filter(
+            fn (Candidat $c) => $c->linkedin_url && ! $c->email && ! $c->phone
+        );
+
+        if ($toEnrich->isEmpty()) {
+            return;
+        }
+
+        $contactData = $this->lusha->getContactDataBatch(
+            $toEnrich->pluck('linkedin_url')->all()
+        );
+
+        $stillMissing = collect();
+
+        foreach ($toEnrich as $candidate) {
+            $data = $contactData[$candidate->linkedin_url] ?? null;
+
+            if (! $data || (empty($data['email']) && empty($data['phone']))) {
+                $stillMissing->push($candidate);
+
+                continue;
+            }
+
+            $this->persistContactData($candidate, $data);
+        }
+
+        if ($stillMissing->isEmpty()) {
+            return;
+        }
+
+        logger()->info('[Importer] Lusha found no contact data for some candidates — falling back to SignalHire.', [
+            'count' => $stillMissing->count(),
+        ]);
+
+        $fallbackData = $this->signalHire->searchBatch(
+            $stillMissing->pluck('linkedin_url')->all()
+        );
+
+        if (empty($fallbackData)) {
+            return;
+        }
+
+        foreach ($stillMissing as $candidate) {
+            $data = $fallbackData[$candidate->linkedin_url] ?? null;
+
+            if (! $data) {
+                continue;
+            }
+
+            $this->persistContactData($candidate, $data);
+        }
+    }
+
+    /**
+     * Persist email/phone contact data onto a candidate row.
+     * Shared by both the Lusha and SignalHire enrichment paths.
+     */
+    private function persistContactData(Candidat $candidate, array $data): void
+    {
+        try {
+            $candidate->forceFill([
+                'email' => $data['email'] ?? null,
+                'phone' => $data['phone'] ?? null,
+            ])->save();
+        } catch (\Throwable $e) {
+            logger()->warning('[Importer] Failed to persist contact data.', [
+                'candidate_id' => $candidate->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Attach scored candidates to the brief pivot, skipping those below MIN_SCORE.
      *
      * @return int Number of candidates attached.
@@ -257,6 +373,11 @@ class ApifyCandidateImporter
     /**
      * Insert or update a Candidat record from raw Apify profile data.
      * Uses linkedin_url as the unique key.
+     *
+     * Contact enrichment (email/phone) is handled separately in
+     * enrichBatchAndPersist() after all candidates in a page/dataset are
+     * upserted, so each contact provider is called once per batch instead
+     * of once per candidate.
      */
     private function upsertCandidate(array $item): Candidat
     {
